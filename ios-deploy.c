@@ -1023,6 +1023,10 @@ void upload_file(AMDeviceRef device) {
         printf("Cannot write to %s. Permission error.\n", target_filename);
         exit(1);
     }
+    if (ret == 0x0009) {
+        printf("Target %s is a directory.\n", target_filename);
+        exit(1);
+    }
     assert(ret == 0);
     assert(AFCFileRefWrite(afc_conn_p, file_ref, file_content, file_size) == 0);
     assert(AFCFileRefClose(afc_conn_p, file_ref) == 0);
