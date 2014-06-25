@@ -1085,6 +1085,7 @@ void usage(const char* app) {
         "  -r, --uninstall              uninstall the app before install (do not use with -m; app cache and data are cleared) \n"
         "  -1, --bundle_id <bundle id>  specify bundle id for list and upload\n"
         "  -l, --list                   list files\n"
+        "  -o, --upload <file>          upload file\n"
         "  -V, --version                print the executable version \n",
         app);
 }
@@ -1111,6 +1112,7 @@ int main(int argc, char *argv[]) {
         { "port", required_argument, NULL, 'p' },
         { "uninstall", no_argument, NULL, 'r' },
         { "list", no_argument, NULL, 'l' },
+        { "upload", required_argument, NULL, '1'},
         { NULL, 0, NULL, 0 },
     };
     char ch;
