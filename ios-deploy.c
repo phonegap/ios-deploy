@@ -1016,6 +1016,8 @@ void upload_file(AMDeviceRef device) {
         *lastSlash = '\0';
         assert(AFCDirectoryCreate(afc_conn_p, dirpath) == 0);
     }
+    
+    printf("a:%s\n", target_filename);
 
     assert(AFCFileRefOpen(afc_conn_p, target_filename, 3, &file_ref) == 0);
     assert(AFCFileRefWrite(afc_conn_p, file_ref, file_content, file_size) == 0);
@@ -1045,7 +1047,11 @@ void handle_device(AMDeviceRef device) {
     }
     
     if (command_only) {
-        list_files(device);
+        if (strcmp("list", command) == 0) {
+            list_files(device);
+        } else if (strcmp("upload", command) == 0) {
+            upload_file(device);
+        }
         exit(0);
     }
 
@@ -1206,7 +1212,7 @@ int main(int argc, char *argv[]) {
     };
     char ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunlrIi:b:a:t:g:x:p:1:2:", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunlrIi:b:a:t:g:x:p:1:2:o:", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
