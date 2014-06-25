@@ -128,7 +128,7 @@ mach_error_t AMDeviceLookupApplications(AMDeviceRef device, CFDictionaryRef opti
 bool found_device = false, debug = false, verbose = false, unbuffered = false, nostart = false, detect_only = false, install = true, uninstall = false;
 bool command_only = false;
 char *command = NULL;
-char *target_dir = NULL;
+char *target_filename = NULL;
 char *upload_pathname = NULL;
 char *bundle_id = NULL;
 bool interactive = true;
@@ -930,6 +930,43 @@ service_conn_t start_house_arrest_service(AMDeviceRef device) {
     return houseFd;
 }
 
+char* get_filename_from_path(char* path)
+{
+    char *ptr = path + strlen(path);
+    while (ptr > path)
+    {
+        if (*ptr == '/')
+            break;
+        --ptr;
+    }
+    if (ptr+1 >= path+strlen(path))
+        return NULL;
+    if (ptr == path)
+        return ptr;
+    return ptr+1;
+}
+
+void* read_file_to_memory(char * path, size_t* file_size)
+{
+    struct stat buf;
+    int err = stat(path, &buf);
+    if (err < 0)
+    {
+        return NULL;
+    }
+    
+    *file_size = buf.st_size;
+    FILE* fd = fopen(path, "r");
+    char* content = malloc(*file_size);
+    if (fread(content, *file_size, 1, fd) != 1)
+    {
+        fclose(fd);
+        return NULL;
+    }
+    fclose(fd);
+    return content;
+}
+
 void list_files(AMDeviceRef device)
 {
     service_conn_t houseFd = start_house_arrest_service(device);
@@ -962,7 +999,7 @@ void upload_file(AMDeviceRef device) {
     
     if (!file_content)
     {
-        PRINT("Could not open file: %s\n", upload_pathname);
+        printf("Could not open file: %s\n", upload_pathname);
         exit(-1);
     }
 
@@ -1135,7 +1172,7 @@ void usage(const char* app) {
         "  -1, --bundle_id <bundle id>  specify bundle id for list and upload\n"
         "  -l, --list                   list files\n"
         "  -o, --upload <file>          upload file\n"
-        "  -2, --to <device path>	use together with upload file. specify target dir for upload\n"
+        "  -2, --to <target pathname>	use together with upload file. specify target for upload\n"
         "  -V, --version                print the executable version \n",
         app);
 }
@@ -1219,7 +1256,7 @@ int main(int argc, char *argv[]) {
             bundle_id = optarg;
             break;
         case '2':
-            target_dir = optarg;
+            target_filename = optarg;
             break;
         case 'o':
             command_only = true;
