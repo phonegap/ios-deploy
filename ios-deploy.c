@@ -1083,7 +1083,8 @@ void usage(const char* app) {
         "  -m, --noinstall              directly start debugging without app install (-d not required)\n"
         "  -p, --port <number>          port used for device, default: 12345 \n"
         "  -r, --uninstall              uninstall the app before install (do not use with -m; app cache and data are cleared) \n"
-        "  -l, --list <bundle id>       list files\n"
+        "  -1, --bundle_id <bundle id>  specify bundle id for list and upload\n"
+        "  -l, --list                   list files\n"
         "  -V, --version                print the executable version \n",
         app);
 }
@@ -1109,12 +1110,12 @@ int main(int argc, char *argv[]) {
         { "noinstall", no_argument, NULL, 'm' },
         { "port", required_argument, NULL, 'p' },
         { "uninstall", no_argument, NULL, 'r' },
-        { "list", required_argument, NULL, 'l' },
+        { "list", no_argument, NULL, 'l' },
         { NULL, 0, NULL, 0 },
     };
     char ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunrIi:b:a:t:g:x:p:l:", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunlrIi:b:a:t:g:x:p:1:", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -1160,10 +1161,12 @@ int main(int argc, char *argv[]) {
         case 'r':
             uninstall = 1;
             break;
+        case '1':
+            bundle_id = optarg;
+            break;
         case 'l':
             command_only = true;
             command = "list";
-            bundle_id = optarg;
             break;
         default:
             usage(argv[0]);
