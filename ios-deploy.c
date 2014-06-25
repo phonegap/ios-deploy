@@ -959,7 +959,6 @@ void handle_device(AMDeviceRef device) {
     }
     
     if (command_only) {
-        printf("executing: %s", command);
         list_files(device);
         exit(0);
     }
