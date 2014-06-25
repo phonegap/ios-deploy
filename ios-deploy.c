@@ -1017,9 +1017,13 @@ void upload_file(AMDeviceRef device) {
         assert(AFCDirectoryCreate(afc_conn_p, dirpath) == 0);
     }
     
-    printf("a:%s\n", target_filename);
 
-    assert(AFCFileRefOpen(afc_conn_p, target_filename, 3, &file_ref) == 0);
+    int ret = AFCFileRefOpen(afc_conn_p, target_filename, 3, &file_ref);
+    if (ret == 0x000a) {
+        printf("Cannot write to %s. Permission error.\n", target_filename);
+        exit(1);
+    }
+    assert(ret == 0);
     assert(AFCFileRefWrite(afc_conn_p, file_ref, file_content, file_size) == 0);
     assert(AFCFileRefClose(afc_conn_p, file_ref) == 0);
     assert(AFCConnectionClose(afc_conn_p) == 0);
