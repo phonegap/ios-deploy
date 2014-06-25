@@ -26,6 +26,7 @@ Install and debug iPhone apps without using Xcode. Designed to work on unjailbro
       -m, --noinstall              directly start debugging without app install (-d not required) 
       -p, --port <number>          port used for device, default: 12345
       -r, --uninstall              uninstall the app before install (do not use with -m; app cache and data are cleared)       
+      -l, --list <bundle id>       list files
       -V, --version                print the executable version
 
 ## Demo
