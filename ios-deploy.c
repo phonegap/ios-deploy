@@ -126,6 +126,9 @@ int AMDeviceMountImage(AMDeviceRef device, CFStringRef image, CFDictionaryRef op
 mach_error_t AMDeviceLookupApplications(AMDeviceRef device, CFDictionaryRef options, CFDictionaryRef *result);
 
 bool found_device = false, debug = false, verbose = false, unbuffered = false, nostart = false, detect_only = false, install = true, uninstall = false;
+bool command_only = false;
+char *command = NULL;
+char *bundle_id = NULL;
 bool interactive = true;
 char *app_path = NULL;
 char *device_id = NULL;
@@ -800,7 +803,7 @@ void launch_debugger(AMDeviceRef device, CFURLRef url) {
             perror("failed launching lldb");
 
         close(pfd[0]);
-        close(pfd[1]);
+            close(pfd[1]);
         // Notify parent we're exiting
         kill(parent, SIGLLDB);
         // Pass lldb exit code
@@ -849,6 +852,88 @@ CFStringRef get_bundle_id(CFURLRef app_url)
     return bundle_id;
 }
 
+void read_dir(service_conn_t afcFd, afc_connection* afc_conn_p, const char* dir)
+{
+    char *dir_ent;
+    
+    afc_connection afc_conn;
+    if (!afc_conn_p) {
+        afc_conn_p = &afc_conn;
+        AFCConnectionOpen(afcFd, 0, &afc_conn_p);
+    }
+    
+    printf("%s\n", dir);
+    
+    afc_dictionary afc_dict;
+    afc_dictionary* afc_dict_p = &afc_dict;
+    AFCFileInfoOpen(afc_conn_p, dir, &afc_dict_p);
+    
+    afc_directory afc_dir;
+    afc_directory* afc_dir_p = &afc_dir;
+    afc_error_t err = AFCDirectoryOpen(afc_conn_p, dir, &afc_dir_p);
+    
+    if (err != 0)
+    {
+        // Couldn't open dir - was probably a file
+        return;
+    }
+    
+    while(true) {
+        err = AFCDirectoryRead(afc_conn_p, afc_dir_p, &dir_ent);
+        
+        if (!dir_ent)
+            break;
+        
+        if (strcmp(dir_ent, ".") == 0 || strcmp(dir_ent, "..") == 0)
+            continue;
+        
+        char* dir_joined = malloc(strlen(dir) + strlen(dir_ent) + 2);
+        strcpy(dir_joined, dir);
+        if (dir_joined[strlen(dir)-1] != '/')
+            strcat(dir_joined, "/");
+        strcat(dir_joined, dir_ent);
+        read_dir(afcFd, afc_conn_p, dir_joined);
+        free(dir_joined);
+    }
+    
+    AFCDirectoryClose(afc_conn_p, afc_dir_p);
+}
+
+
+// Used to send files to app-specific sandbox (Documents dir)
+service_conn_t start_house_arrest_service(AMDeviceRef device) {
+    AMDeviceConnect(device);
+    assert(AMDeviceIsPaired(device));
+    assert(AMDeviceValidatePairing(device) == 0);
+    assert(AMDeviceStartSession(device) == 0);
+    
+    service_conn_t houseFd;
+    
+    CFStringRef cf_bundle_id = CFStringCreateWithCString(NULL, bundle_id, kCFStringEncodingASCII);
+    if (AMDeviceStartHouseArrestService(device, cf_bundle_id, 0, &houseFd, 0) != 0)
+    {
+        printf("Unable to find bundle with id: %s\n", bundle_id);
+        exit(1);
+    }
+    
+    assert(AMDeviceStopSession(device) == 0);
+    assert(AMDeviceDisconnect(device) == 0);
+    CFRelease(cf_bundle_id);
+    
+    return houseFd;
+}
+
+void list_files(AMDeviceRef device)
+{
+    service_conn_t houseFd = start_house_arrest_service(device);
+    
+    afc_connection afc_conn;
+    afc_connection* afc_conn_p = &afc_conn;
+    AFCConnectionOpen(houseFd, 0, &afc_conn_p);
+    
+    read_dir(houseFd, afc_conn_p, "/");
+}
+
 void handle_device(AMDeviceRef device) {
     if (found_device) return; // handle one device only
     CFStringRef found_device_id = AMDeviceCopyDeviceIdentifier(device);
@@ -865,6 +950,12 @@ void handle_device(AMDeviceRef device) {
 
     if (detect_only) {
         printf("[....] Found device (%s).\n", CFStringGetCStringPtr(found_device_id, CFStringGetSystemEncoding()));
+        exit(0);
+    }
+    
+    if (command_only) {
+        printf("executing: %s", command);
+        list_files(device);
         exit(0);
     }
 
@@ -988,6 +1079,7 @@ void usage(const char* app) {
         "  -m, --noinstall              directly start debugging without app install (-d not required)\n"
         "  -p, --port <number>          port used for device, default: 12345 \n"
         "  -r, --uninstall              uninstall the app before install (do not use with -m; app cache and data are cleared) \n"
+        "  -l, --list <bundle id>       list files\n"
         "  -V, --version                print the executable version \n",
         app);
 }
@@ -1013,11 +1105,12 @@ int main(int argc, char *argv[]) {
         { "noinstall", no_argument, NULL, 'm' },
         { "port", required_argument, NULL, 'p' },
         { "uninstall", no_argument, NULL, 'r' },
+        { "list", required_argument, NULL, 'l' },
         { NULL, 0, NULL, 0 },
     };
     char ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunrIi:b:a:t:g:x:p:", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunrIi:b:a:t:g:x:p:l:", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -1063,13 +1156,18 @@ int main(int argc, char *argv[]) {
         case 'r':
             uninstall = 1;
             break;
+        case 'l':
+            command_only = true;
+            command = "list";
+            bundle_id = optarg;
+            break;
         default:
             usage(argv[0]);
             return exitcode_error;
         }
     }
 
-    if (!app_path && !detect_only) {
+    if (!app_path && !detect_only && !command_only) {
         usage(argv[0]);
         exit(exitcode_error);
     }
