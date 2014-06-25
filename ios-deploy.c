@@ -909,6 +909,11 @@ service_conn_t start_house_arrest_service(AMDeviceRef device) {
     
     service_conn_t houseFd;
     
+    if (bundle_id == NULL) {
+        printf("Bundle id is not specified\n");
+        exit(1);
+    }
+    
     CFStringRef cf_bundle_id = CFStringCreateWithCString(NULL, bundle_id, kCFStringEncodingASCII);
     if (AMDeviceStartHouseArrestService(device, cf_bundle_id, 0, &houseFd, 0) != 0)
     {
