@@ -128,6 +128,8 @@ mach_error_t AMDeviceLookupApplications(AMDeviceRef device, CFDictionaryRef opti
 bool found_device = false, debug = false, verbose = false, unbuffered = false, nostart = false, detect_only = false, install = true, uninstall = false;
 bool command_only = false;
 char *command = NULL;
+char *target_dir = NULL;
+char *upload_pathname = NULL;
 char *bundle_id = NULL;
 bool interactive = true;
 char *app_path = NULL;
@@ -939,6 +941,53 @@ void list_files(AMDeviceRef device)
     read_dir(houseFd, afc_conn_p, "/");
 }
 
+void upload_file(AMDeviceRef device) {
+    service_conn_t houseFd = start_house_arrest_service(device);
+    
+    afc_file_ref file_ref;
+    
+    afc_connection afc_conn;
+    afc_connection* afc_conn_p = &afc_conn;
+    AFCConnectionOpen(houseFd, 0, &afc_conn_p);
+    
+    //        read_dir(houseFd, NULL, "/");
+    
+    if (!target_filename)
+    {
+        target_filename = get_filename_from_path(upload_pathname);
+    }
+
+    size_t file_size;
+    void* file_content = read_file_to_memory(upload_pathname, &file_size);
+    
+    if (!file_content)
+    {
+        PRINT("Could not open file: %s\n", upload_pathname);
+        exit(-1);
+    }
+
+    // Make sure the directory was created
+    {
+        char *dirpath = strdup(target_filename);
+        char *c = dirpath, *lastSlash = dirpath;
+        while(*c) {
+            if(*c == '/') {
+                lastSlash = c;
+            }
+            c++;
+        }
+        *lastSlash = '\0';
+        assert(AFCDirectoryCreate(afc_conn_p, dirpath) == 0);
+    }
+
+    assert(AFCFileRefOpen(afc_conn_p, target_filename, 3, &file_ref) == 0);
+    assert(AFCFileRefWrite(afc_conn_p, file_ref, file_content, file_size) == 0);
+    assert(AFCFileRefClose(afc_conn_p, file_ref) == 0);
+    assert(AFCConnectionClose(afc_conn_p) == 0);
+    
+    free(file_content);
+}
+
 void handle_device(AMDeviceRef device) {
     if (found_device) return; // handle one device only
     CFStringRef found_device_id = AMDeviceCopyDeviceIdentifier(device);
@@ -1086,6 +1135,7 @@ void usage(const char* app) {
         "  -1, --bundle_id <bundle id>  specify bundle id for list and upload\n"
         "  -l, --list                   list files\n"
         "  -o, --upload <file>          upload file\n"
+        "  -2, --to <device path>	use together with upload file. specify target dir for upload\n"
         "  -V, --version                print the executable version \n",
         app);
 }
@@ -1112,12 +1162,14 @@ int main(int argc, char *argv[]) {
         { "port", required_argument, NULL, 'p' },
         { "uninstall", no_argument, NULL, 'r' },
         { "list", no_argument, NULL, 'l' },
-        { "upload", required_argument, NULL, '1'},
+        { "bundle_id", required_argument, NULL, '1'},
+        { "upload", required_argument, NULL, 'o'},
+        { "to", required_argument, NULL, '2'},
         { NULL, 0, NULL, 0 },
     };
     char ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunlrIi:b:a:t:g:x:p:1:", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunlrIi:b:a:t:g:x:p:1:2:", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -1166,6 +1218,14 @@ int main(int argc, char *argv[]) {
         case '1':
             bundle_id = optarg;
             break;
+        case '2':
+            target_dir = optarg;
+            break;
+        case 'o':
+            command_only = true;
+            upload_pathname = optarg;
+            command = "upload";
+            break;
         case 'l':
             command_only = true;
             command = "list";
@@ -1210,3 +1270,4 @@ int main(int argc, char *argv[]) {
     AMDeviceNotificationSubscribe(&device_callback, 0, 0, NULL, &notify);
     CFRunLoopRun();
 }
+
