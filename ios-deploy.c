@@ -121,6 +121,7 @@ def autoexit_command(debugger, command, result, internal_dict):\n\
 ")
 
 typedef struct am_device * AMDeviceRef;
+mach_error_t AMDeviceSecureStartService(struct am_device *device, CFStringRef service_name, unsigned int *unknown, service_conn_t *handle);
 int AMDeviceSecureTransferPath(int zero, AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
 int AMDeviceSecureInstallApplication(int zero, AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
 int AMDeviceMountImage(AMDeviceRef device, CFStringRef image, CFDictionaryRef options, void *callback, int cbarg);
@@ -1219,31 +1220,37 @@ void handle_device(AMDeviceRef device) {
         assert(AMDeviceStartSession(device) == 0);
 
 
-
+        // NOTE: the secure version doesn't seem to require us to start the AFC service
         service_conn_t afcFd;
-        assert(AMDeviceStartService(device, CFSTR("com.apple.afc"), &afcFd, NULL) == 0);
+        assert(AMDeviceSecureStartService(device, CFSTR("com.apple.afc"), NULL, &afcFd) == 0);
         assert(AMDeviceStopSession(device) == 0);
         assert(AMDeviceDisconnect(device) == 0);
-        assert(AMDeviceTransferApplication(afcFd, path, NULL, transfer_callback, NULL) == 0);
-
-        close(afcFd);
 
         CFStringRef keys[] = { CFSTR("PackageType") };
         CFStringRef values[] = { CFSTR("Developer") };
         CFDictionaryRef options = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+
+        //assert(AMDeviceTransferApplication(afcFd, path, NULL, transfer_callback, NULL) == 0);
+        assert(AMDeviceSecureTransferPath(0, device, url, options, transfer_callback, 0)==0);
+
+        close(afcFd);
+
+        
 
         AMDeviceConnect(device);
         assert(AMDeviceIsPaired(device));
         assert(AMDeviceValidatePairing(device) == 0);
         assert(AMDeviceStartSession(device) == 0);
 
-        service_conn_t installFd;
-        assert(AMDeviceStartService(device, CFSTR("com.apple.mobile.installation_proxy"), &installFd, NULL) == 0);
+        // // NOTE: the secure version doesn't seem to require us to start the installation_proxy service
+        // // Although I can't find it right now, I in some code that the first param of AMDeviceSecureInstallApplication was a "dontStartInstallProxy"
+        // // implying this is done for us by iOS already
 
-        assert(AMDeviceStopSession(device) == 0);
-        assert(AMDeviceDisconnect(device) == 0);
+        //service_conn_t installFd;
+        //assert(AMDeviceSecureStartService(device, CFSTR("com.apple.mobile.installation_proxy"), NULL, &installFd) == 0);
 
-        mach_error_t result = AMDeviceInstallApplication(installFd, path, options, install_callback, NULL);
+        //mach_error_t result = AMDeviceInstallApplication(installFd, path, options, install_callback, NULL);
+        mach_error_t result = AMDeviceSecureInstallApplication(0, device, url, options, install_callback, 0);
         if (result != 0)
         {
             char* error = "Unknown error.";
@@ -1253,7 +1260,10 @@ void handle_device(AMDeviceRef device) {
             exit(exitcode_error);
         }
 
-        close(installFd);
+        // close(installFd);
+
+        assert(AMDeviceStopSession(device) == 0);
+        assert(AMDeviceDisconnect(device) == 0);
 
         CFRelease(path);
         CFRelease(options);
