@@ -147,6 +147,7 @@ pid_t parent = 0;
 pid_t child = 0;
 // Signal sent from child to parent process when LLDB finishes.
 const int SIGLLDB = SIGUSR1;
+AMDeviceRef best_device_match = NULL;
 
 // Error codes we report on different failures, so scripts can distinguish between user app exit
 // codes and our exit codes. For non app errors we use codes in reserved 128-255 range.
@@ -351,7 +352,7 @@ const CFStringRef get_device_hardware_name(const AMDeviceRef device) {
 
 CFStringRef get_device_full_name(const AMDeviceRef device) {
     CFStringRef full_name = NULL,
-                device_id = AMDeviceCopyDeviceIdentifier(device),
+                device_udid = AMDeviceCopyDeviceIdentifier(device),
                 device_name = NULL,
                 model_name = NULL;
 
@@ -361,14 +362,14 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
     model_name = get_device_hardware_name(device);
 
     if(device_name != NULL && model_name != NULL)
-        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ '%@' (%@)"), model_name, device_name, device_id);
+        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ '%@' (%@)"), model_name, device_name, device_udid);
     else
-        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("(%@)"), device_id);
+        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("(%@)"), device_udid);
 
     AMDeviceDisconnect(device);
 
-    if(device_id != NULL)
-        CFRelease(device_id);
+    if(device_udid != NULL)
+        CFRelease(device_udid);
     if(device_name != NULL)
         CFRelease(device_name);
     if(model_name != NULL)
@@ -871,7 +872,7 @@ void setup_dummy_pipe_on_stdin(int pfd[2]) {
 void launch_debugger(AMDeviceRef device, CFURLRef url) {
     CFStringRef device_full_name = get_device_full_name(device),
                 device_interface_name = get_device_interface_name(device);
-                
+
     AMDeviceConnect(device);
     assert(AMDeviceIsPaired(device));
     assert(AMDeviceValidatePairing(device) == 0);
@@ -1161,7 +1162,8 @@ void upload_file(AMDeviceRef device) {
     free(file_content);
 }
 
-void handle_device(AMDeviceRef device) {
+void handle_device(AMDeviceRef device) {    printf("DEVICE CONNECTION: %d\n", AMDeviceGetInterfaceType(device));
+
     if (found_device) 
         return; // handle one device only
 
@@ -1293,7 +1295,12 @@ void handle_device(AMDeviceRef device) {
 void device_callback(struct am_device_notification_callback_info *info, void *arg) {
     switch (info->msg) {
         case ADNCI_MSG_CONNECTED:
-            handle_device(info->dev);
+            if(device_id != NULL || !debug || AMDeviceGetInterfaceType(info->dev) != 2) {
+                handle_device(info->dev);
+            } else if(best_device_match == NULL) {
+                best_device_match = info->dev; 
+                CFRetain(best_device_match);
+            }
         default:
             break;
     }
@@ -1301,8 +1308,17 @@ void device_callback(struct am_device_notification_callback_info *info, void *ar
 
 void timeout_callback(CFRunLoopTimerRef timer, void *info) {
     if (!found_device) {
-        printf("[....] Timed out waiting for device.\n");
-        exit(exitcode_error);
+        if(best_device_match != NULL) {
+            handle_device(best_device_match);
+
+            CFRelease(best_device_match);
+            best_device_match = NULL;
+        }
+
+        if(!found_device) {
+            printf("[....] Timed out waiting for device.\n");
+            exit(exitcode_error);
+        }
     }
 }
 
