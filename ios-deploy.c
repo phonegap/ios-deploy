@@ -1120,13 +1120,19 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
     device_name = AMDeviceCopyValue(device, 0, CFSTR("DeviceName")),
     model_name = get_device_hardware_name(device);
 
-    full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ '%@' (%@)"), model_name, device_name, device_id);
+    if(device_name != NULL && model_name != NULL)
+        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ '%@' (%@)"), model_name, device_name, device_id);
+    else
+        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("(%@)"), device_id);
 
     AMDeviceDisconnect(device);
 
-    CFRelease(device_id);
-    CFRelease(device_name);
-    CFRelease(model_name);
+    if(device_id != NULL)
+        CFRelease(device_id);
+    if(device_name != NULL)
+        CFRelease(device_name);
+    if(model_name != NULL)
+        CFRelease(model_name);
 
     return full_name;
 }
