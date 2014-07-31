@@ -349,6 +349,46 @@ const CFStringRef get_device_hardware_name(const AMDeviceRef device) {
     return CFSTR("Unknown Device");
 }
 
+CFStringRef get_device_full_name(const AMDeviceRef device) {
+    CFStringRef full_name = NULL,
+                device_id = AMDeviceCopyDeviceIdentifier(device),
+                device_name = NULL,
+                model_name = NULL;
+
+    AMDeviceConnect(device);
+    
+    device_name = AMDeviceCopyValue(device, 0, CFSTR("DeviceName")),
+    model_name = get_device_hardware_name(device);
+
+    if(device_name != NULL && model_name != NULL)
+        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ '%@' (%@)"), model_name, device_name, device_id);
+    else
+        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("(%@)"), device_id);
+
+    AMDeviceDisconnect(device);
+
+    if(device_id != NULL)
+        CFRelease(device_id);
+    if(device_name != NULL)
+        CFRelease(device_name);
+    if(model_name != NULL)
+        CFRelease(model_name);
+
+    return full_name;
+}
+
+CFStringRef get_device_interface_name(const AMDeviceRef device) {
+    // AMDeviceGetInterfaceType(device) 0=Unknown, 1 = Direct/USB, 2 = Indirect/WIFI
+    switch(AMDeviceGetInterfaceType(device)) {
+        case 1:
+            return CFSTR("USB");
+        case 2:
+            return CFSTR("WIFI");
+        default:
+            return CFSTR("Unknown Connection");
+    }
+}
+
 CFMutableArrayRef get_device_product_version_parts(AMDeviceRef device) {
     CFStringRef version = AMDeviceCopyValue(device, 0, CFSTR("ProductVersion"));
     CFArrayRef parts = CFStringCreateArrayBySeparatingStrings(NULL, version, CFSTR("."));
@@ -829,12 +869,23 @@ void setup_dummy_pipe_on_stdin(int pfd[2]) {
 }
 
 void launch_debugger(AMDeviceRef device, CFURLRef url) {
+    CFStringRef device_full_name = get_device_full_name(device),
+                device_interface_name = get_device_interface_name(device);
+                
     AMDeviceConnect(device);
     assert(AMDeviceIsPaired(device));
     assert(AMDeviceValidatePairing(device) == 0);
     assert(AMDeviceStartSession(device) == 0);
 
     printf("------ Debug phase ------\n");
+
+    if(AMDeviceGetInterfaceType(device) == 2)
+    {
+        printf("Cannot debug %s over %s.\n", CFStringGetCStringPtr(device_full_name, CFStringGetSystemEncoding()), CFStringGetCStringPtr(device_interface_name, CFStringGetSystemEncoding()));
+        exit(0);
+    }
+
+    printf("Starting debug of %s connected through %s...\n", CFStringGetCStringPtr(device_full_name, CFStringGetSystemEncoding()), CFStringGetCStringPtr(device_interface_name, CFStringGetSystemEncoding()));
 
     mount_developer_image(device);      // put debugserver on the device
     start_remote_debug_server(device);  // start debugserver
@@ -1110,48 +1161,10 @@ void upload_file(AMDeviceRef device) {
     free(file_content);
 }
 
-CFStringRef get_device_full_name(const AMDeviceRef device) {
-    CFStringRef full_name = NULL,
-                device_id = AMDeviceCopyDeviceIdentifier(device),
-                device_name = NULL,
-                model_name = NULL;
-
-    AMDeviceConnect(device);
-    
-    device_name = AMDeviceCopyValue(device, 0, CFSTR("DeviceName")),
-    model_name = get_device_hardware_name(device);
-
-    if(device_name != NULL && model_name != NULL)
-        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ '%@' (%@)"), model_name, device_name, device_id);
-    else
-        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("(%@)"), device_id);
-
-    AMDeviceDisconnect(device);
-
-    if(device_id != NULL)
-        CFRelease(device_id);
-    if(device_name != NULL)
-        CFRelease(device_name);
-    if(model_name != NULL)
-        CFRelease(model_name);
-
-    return full_name;
-}
-
-CFStringRef get_device_interface_name(const AMDeviceRef device) {
-    // AMDeviceGetInterfaceType(device) 0=Unknown, 1 = Direct/USB, 2 = Indirect/WIFI
-    switch(AMDeviceGetInterfaceType(device)) {
-        case 1:
-            return CFSTR("USB");
-        case 2:
-            return CFSTR("WIFI");
-        default:
-            return CFSTR("Unknown Connection");
-    }
-}
-
 void handle_device(AMDeviceRef device) {
-    if (found_device) return; // handle one device only
+    if (found_device) 
+        return; // handle one device only
+
     CFStringRef found_device_id = AMDeviceCopyDeviceIdentifier(device),
                 device_full_name = get_device_full_name(device),
                 device_interface_name = get_device_interface_name(device);
@@ -1271,7 +1284,9 @@ void handle_device(AMDeviceRef device) {
         printf("[100%%] Installed package %s\n", app_path);
     }
 
-    if (!debug) exit(0); // no debug phase
+    if (!debug) 
+        exit(0); // no debug phase
+    
     launch_debugger(device, url);
 }
 
