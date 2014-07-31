@@ -1162,8 +1162,7 @@ void upload_file(AMDeviceRef device) {
     free(file_content);
 }
 
-void handle_device(AMDeviceRef device) {    printf("DEVICE CONNECTION: %d\n", AMDeviceGetInterfaceType(device));
-
+void handle_device(AMDeviceRef device) {
     if (found_device) 
         return; // handle one device only
 
