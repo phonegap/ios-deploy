@@ -931,17 +931,7 @@ void launch_debugger(AMDeviceRef device, CFURLRef url) {
         signal(SIGHUP, SIG_DFL);
         signal(SIGLLDB, SIG_DFL);
         child = getpid();
-
-        int pfd[2] = {-1, -1};
-        if (isatty(STDIN_FILENO))
-            // If we are running on a terminal, then we need to bring process to foreground for input
-            // to work correctly on lldb's end.
-            bring_process_to_foreground();
-        else
-            // If lldb is running in a non terminal environment, then it freaks out spamming "^D" and
-            // "quit". It seems this is caused by read() on stdin returning EOF in lldb. To hack around
-            // this we setup a dummy pipe on stdin, so read() would block expecting "user's" input.
-            setup_dummy_pipe_on_stdin(pfd);
+        bring_process_to_foreground();
 
         char lldb_shell[400];
         sprintf(lldb_shell, LLDB_SHELL);
@@ -952,8 +942,6 @@ void launch_debugger(AMDeviceRef device, CFURLRef url) {
         if (status == -1)
             perror("failed launching lldb");
 
-        close(pfd[0]);
-            close(pfd[1]);
         // Notify parent we're exiting
         kill(parent, SIGLLDB);
         // Pass lldb exit code
