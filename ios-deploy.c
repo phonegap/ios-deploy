@@ -458,22 +458,38 @@ CFStringRef copy_device_support_path(AMDeviceRef device) {
     return path;
 }
 
-CFStringRef copy_developer_disk_image_path(CFStringRef deviceSupportPath) {
-    CFStringRef path = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/%@"), deviceSupportPath, CFSTR("DeveloperDiskImage.dmg"));
-    if (!path_exists(path)) {
-        CFRelease(path);
-        path = NULL;
-    }
+CFStringRef copy_developer_disk_image_path(AMDeviceRef device) {
+    CFStringRef version = NULL;
+    CFStringRef build = AMDeviceCopyValue(device, 0, CFSTR("BuildVersion"));
+    CFStringRef path = NULL;
+    CFMutableArrayRef version_parts = get_device_product_version_parts(device);
 
-    if (path == NULL) {
-        // Sometimes Latest seems to be missing in Xcode, in that case use find and hope for the best
-        path = copy_long_shot_disk_image_path();
-        if (CFStringGetLength(path) < 5) {
-            CFRelease(path);
-            path = NULL;
+    while (CFArrayGetCount(version_parts) > 0) {
+        version = CFStringCreateByCombiningStrings(NULL, version_parts, CFSTR("."));
+        if (path == NULL) {
+            path = copy_xcode_path_for(CFSTR("iOS DeviceSupport"), CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@)/DeveloperDiskImage.dmg"), version, build));
         }
+        if (path == NULL) {
+            path = copy_xcode_path_for(CFSTR("Platforms/iPhoneOS.platform/DeviceSupport"), CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@)/DeveloperDiskImage.dmg"), version, build));
+        }
+        if (path == NULL) {
+            path = copy_xcode_path_for(CFSTR("Platforms/iPhoneOS.platform/DeviceSupport"), CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (*)/DeveloperDiskImage.dmg"), version));
+        }
+        if (path == NULL) {
+            path = copy_xcode_path_for(CFSTR("Platforms/iPhoneOS.platform/DeviceSupport"), CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/DeveloperDiskImage.dmg"), version));
+        }
+        if (path == NULL) {
+            path = copy_xcode_path_for(CFSTR("Platforms/iPhoneOS.platform/DeviceSupport/Latest"), CFSTR("DeveloperDiskImage.dmg"));
+        }
+        CFRelease(version);
+        if (path != NULL) {
+            break;
+        }
+        CFArrayRemoveValueAtIndex(version_parts, CFArrayGetCount(version_parts) - 1);
     }
 
+    CFRelease(version_parts);
+    CFRelease(build);
     if (path == NULL)
     {
         printf("[ !! ] Unable to locate DeveloperDiskImage.dmg.\n[ !! ] This probably means you don't have Xcode installed, you will need to launch the app manually and logging output will not be shown!\n");
@@ -497,7 +513,7 @@ void mount_callback(CFDictionaryRef dict, int arg) {
 
 void mount_developer_image(AMDeviceRef device) {
     CFStringRef ds_path = copy_device_support_path(device);
-    CFStringRef image_path = copy_developer_disk_image_path(ds_path);
+    CFStringRef image_path = copy_developer_disk_image_path(device);
     CFStringRef sig_path = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@.signature"), image_path);
 
     if (verbose) {
