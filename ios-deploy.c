@@ -1673,6 +1673,7 @@ void usage(const char* app) {
         "  -w, --download               download app tree\n"
         "  -2, --to <target pathname>   use together with up/download file/tree. specify target\n"
         "  -V, --version                print the executable version \n",
+        "  -e, --exists                 check if the app with given bundle_id is installed or not \n",
         app);
 }
 
