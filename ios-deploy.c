@@ -1274,6 +1274,40 @@ void list_files(AMDeviceRef device)
     }
 }
 
+int app_exists(AMDeviceRef device)
+{
+    if (bundle_id == NULL) {
+        printf("Bundle id is not specified\n");
+        return false;
+    }
+
+    AMDeviceConnect(device);
+    assert(AMDeviceIsPaired(device));
+    assert(AMDeviceValidatePairing(device) == 0);
+    assert(AMDeviceStartSession(device) == 0);
+
+    CFStringRef cf_bundle_id = CFStringCreateWithCString(NULL, bundle_id, kCFStringEncodingASCII);
+
+    NSArray *a = [NSArray arrayWithObjects:@"CFBundleIdentifier", nil];
+    NSDictionary *optionsDict = [NSDictionary dictionaryWithObject:a forKey:@"ReturnAttributes"];
+    CFDictionaryRef options = (CFDictionaryRef)optionsDict;
+    
+    CFDictionaryRef result = nil;
+    afc_error_t resultStatus = AMDeviceLookupApplications(device, options, &result);
+    assert(resultStatus == 0);
+
+    CFDictionaryRef app_dict = CFDictionaryGetValue(result, cf_bundle_id);
+
+    int appExists = (app_dict == NULL) ? -1 : 0;
+
+    CFRelease(cf_bundle_id);
+
+    assert(AMDeviceStopSession(device) == 0);
+    assert(AMDeviceDisconnect(device) == 0);
+
+    return appExists;
+}
+
 void copy_file_callback(afc_connection* afc_conn_p, const char *name,int file)
 {
     const char *local_name=name;
@@ -1456,6 +1490,8 @@ void handle_device(AMDeviceRef device) {
             upload_file(device);
         } else if (strcmp("download", command) == 0) {
             download_tree(device);
+        } else if (strcmp("exists", command) == 0) {
+            exit(app_exists(device));
         }
         exit(0);
     }
@@ -1666,11 +1702,12 @@ int main(int argc, char *argv[]) {
         { "upload", required_argument, NULL, 'o'},
         { "download", optional_argument, NULL, 'w'},
         { "to", required_argument, NULL, '2'},
+        { "exists", no_argument, NULL, 'e'},
         { NULL, 0, NULL, 0 },
     };
     char ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunrILi:b:a:t:g:x:p:1:2:o:l::w::", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunrILei:b:a:t:g:x:p:1:2:o:l::w::", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -1741,6 +1778,10 @@ int main(int argc, char *argv[]) {
             command_only = true;
             command = "download";
             list_root = optarg;
+            break;
+        case 'e':
+            command_only = true;
+            command = "exists";
             break;
         default:
             usage(argv[0]);
