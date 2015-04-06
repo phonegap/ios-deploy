@@ -61,6 +61,7 @@ const char* lldb_prep_noninteractive_cmds = "\
  */
 #define LLDB_FRUITSTRAP_MODULE CFSTR("\
 import lldb\n\
+import os\n\
 import sys\n\
 import shlex\n\
 \n\
@@ -90,13 +91,14 @@ def connect_command(debugger, command, result, internal_dict):\n\
 \n\
 def run_command(debugger, command, result, internal_dict):\n\
     device_app = internal_dict['fruitstrap_device_app']\n\
+    args = command.split('--',1)\n\
     error = lldb.SBError()\n\
     lldb.target.modules[0].SetPlatformFileSpec(lldb.SBFileSpec(device_app))\n\
-    lldb.target.Launch(lldb.SBLaunchInfo(shlex.split('{args}')), error)\n\
+    lldb.target.Launch(lldb.SBLaunchInfo(shlex.split(args[1] and args[1] or '{args}')), error)\n\
     lockedstr = ': Locked'\n\
     if lockedstr in str(error):\n\
        print('\\nDevice Locked\\n')\n\
-       sys.exit(254)\n\
+       os._exit(254)\n\
     else:\n\
        print(str(error))\n\
 \n\
@@ -106,12 +108,16 @@ def safequit_command(debugger, command, result, internal_dict):\n\
     listener.StartListeningForEvents(process.GetBroadcaster(), lldb.SBProcess.eBroadcastBitStateChanged | lldb.SBProcess.eBroadcastBitSTDOUT | lldb.SBProcess.eBroadcastBitSTDERR)\n\
     event = lldb.SBEvent()\n\
     while True:\n\
-        if listener.WaitForEvent(1, event):\n\
-            state = process.GetStateFromEvent(event)\n\
+        if listener.WaitForEvent(1, event) and lldb.SBProcess.EventIsProcessEvent(event):\n\
+            state = lldb.SBProcess.GetStateFromEvent(event)\n\
         else:\n\
-            state = lldb.eStateInvalid\n\
-        process.Detach()\n\
-        sys.exit(0)\n\
+            state = process.GetState()\n\
+\n\
+        if state == lldb.eStateRunning:\n\
+            process.Detach()\n\
+            os._exit(0)\n\
+        elif state > lldb.eStateRunning:\n\
+            os._exit(state)\n\
 \n\
 def autoexit_command(debugger, command, result, internal_dict):\n\
     process = lldb.target.process\n\
@@ -119,10 +125,16 @@ def autoexit_command(debugger, command, result, internal_dict):\n\
     listener.StartListeningForEvents(process.GetBroadcaster(), lldb.SBProcess.eBroadcastBitStateChanged | lldb.SBProcess.eBroadcastBitSTDOUT | lldb.SBProcess.eBroadcastBitSTDERR)\n\
     event = lldb.SBEvent()\n\
     while True:\n\
-        if listener.WaitForEvent(1, event):\n\
-            state = process.GetStateFromEvent(event)\n\
+        if listener.WaitForEvent(1, event) and lldb.SBProcess.EventIsProcessEvent(event):\n\
+            state = lldb.SBProcess.GetStateFromEvent(event)\n\
         else:\n\
-            state = lldb.eStateInvalid\n\
+            state = process.GetState()\n\
+\n\
+        if state == lldb.eStateExited:\n\
+            os._exit(process.GetExitStatus())\n\
+        elif state == lldb.eStateStopped:\n\
+            debugger.HandleCommand('bt')\n\
+            os._exit({exitcode_app_crash})\n\
 \n\
         stdout = process.GetSTDOUT(1024)\n\
         while stdout:\n\
@@ -133,14 +145,6 @@ def autoexit_command(debugger, command, result, internal_dict):\n\
         while stderr:\n\
             sys.stdout.write(stderr)\n\
             stderr = process.GetSTDERR(1024)\n\
-\n\
-        if lldb.SBProcess.EventIsProcessEvent(event):\n\
-            if state == lldb.eStateExited:\n\
-                sys.exit(process.GetExitStatus())\n\
-            if state == lldb.eStateStopped:\n\
-                debugger.HandleCommand('frame select')\n\
-                debugger.HandleCommand('bt')\n\
-                sys.exit({exitcode_app_crash})\n\
 ")
 
 typedef struct am_device * AMDeviceRef;
@@ -164,7 +168,7 @@ char *device_id = NULL;
 char *args = NULL;
 char *list_root = NULL;
 int timeout = 0;
-int port = 12345;
+int port = 0;	// 0 means "dynamically assigned"
 CFStringRef last_path = NULL;
 service_conn_t gdbfd;
 pid_t parent = 0;
@@ -822,22 +826,9 @@ server_callback (CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef add
     int res;
 
     if (CFDataGetLength (data) == 0) {
-        // FIXME: Close the socket
-        //shutdown (CFSocketGetNative (lldb_socket), SHUT_RDWR);
-        //close (CFSocketGetNative (lldb_socket));
-        CFSocketInvalidate(lldb_socket);
-        CFSocketInvalidate(server_socket);
-        int mypid = getpid();
-        assert((child != 0) && (child != mypid)); //child should not be here
-        if ((parent != 0) && (parent == mypid) && (child != 0))
-        {
-            if (verbose)
-            {
-                printf("Got an empty packet hence killing child (%d) tree\n", child);
-            }
-            kill_ptree(child, SIGHUP);
-        }
-        exit(exitcode_error);
+        // close the socket on which we've got end-of-file, the server_socket.
+        CFSocketInvalidate(s);
+        CFRelease(s);
         return;
     }
     res = write (CFSocketGetNative (lldb_socket), CFDataGetBytePtr (data), CFDataGetLength (data));
@@ -847,8 +838,12 @@ void lldb_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef a
 {
     //printf ("lldb: %s\n", CFDataGetBytePtr (data));
 
-    if (CFDataGetLength (data) == 0)
+    if (CFDataGetLength (data) == 0) {
+        // close the socket on which we've got end-of-file, the lldb_socket.
+        CFSocketInvalidate(s);
+        CFRelease(s);
         return;
+    }
     write (gdbfd, CFDataGetBytePtr (data), CFDataGetLength (data));
 }
 
@@ -859,21 +854,20 @@ void fdvendor_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataR
     //PRINT ("callback!\n");
 
     lldb_socket  = CFSocketCreateWithNative(NULL, socket, kCFSocketDataCallBack, &lldb_callback, NULL);
+    int flag = 1;
+    int res = setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(flag));
+    assert(res == 0);
     CFRunLoopAddSource(CFRunLoopGetMain(), CFSocketCreateRunLoopSource(NULL, lldb_socket, 0), kCFRunLoopCommonModes);
+
+    CFSocketInvalidate(s);
+    CFRelease(s);
 }
 
 void start_remote_debug_server(AMDeviceRef device) {
-    char buf [256];
-    int res, err, i;
-    char msg [256];
-    int chsum, len;
-    struct stat s;
-    socklen_t buflen;
-    struct sockaddr name;
-    int namelen;
 
-    assert(AMDeviceStartService(device, CFSTR("com.apple.debugserver"), &gdbfd, NULL) == 0);
-    assert (gdbfd);
+    int res = AMDeviceStartService(device, CFSTR("com.apple.debugserver"), &gdbfd, NULL);
+    assert(res == 0);
+    assert(gdbfd > 0);
 
     /*
      * The debugserver connection is through a fd handle, while lldb requires a host/port to connect, so create an intermediate
@@ -887,20 +881,24 @@ void start_remote_debug_server(AMDeviceRef device) {
     addr4.sin_len = sizeof(addr4);
     addr4.sin_family = AF_INET;
     addr4.sin_port = htons(port);
-    addr4.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
     CFSocketRef fdvendor = CFSocketCreate(NULL, PF_INET, 0, 0, kCFSocketAcceptCallBack, &fdvendor_callback, NULL);
 
-    int yes = 1;
-    setsockopt(CFSocketGetNative(fdvendor), SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
-    int flag = 1;
-    res = setsockopt(CFSocketGetNative(fdvendor), IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
-    assert (res == 0);
+    if (port) {
+        int yes = 1;
+        setsockopt(CFSocketGetNative(fdvendor), SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+    }
 
     CFDataRef address_data = CFDataCreate(NULL, (const UInt8 *)&addr4, sizeof(addr4));
 
     CFSocketSetAddress(fdvendor, address_data);
     CFRelease(address_data);
+    socklen_t addrlen = sizeof(addr4);
+    res = getsockname(CFSocketGetNative(fdvendor),(struct sockaddr *)&addr4,&addrlen);
+    assert(res == 0);
+    port = ntohs(addr4.sin_port);
+
     CFRunLoopAddSource(CFRunLoopGetMain(), CFSocketCreateRunLoopSource(NULL, fdvendor, 0), kCFRunLoopCommonModes);
 }
 
@@ -1629,7 +1627,7 @@ void usage(const char* app) {
         "  -L, --justlaunch             just launch the app and exit lldb\n"
         "  -v, --verbose                enable verbose output\n"
         "  -m, --noinstall              directly start debugging without app install (-d not required)\n"
-        "  -p, --port <number>          port used for device, default: 12345 \n"
+        "  -p, --port <number>          port used for device, default: dynamic\n"
         "  -r, --uninstall              uninstall the app before install (do not use with -m; app cache and data are cleared) \n"
         "  -1, --bundle_id <bundle id>  specify bundle id for list and upload\n"
         "  -l, --list                   list files\n"
