@@ -1574,7 +1574,7 @@ void handle_device(AMDeviceRef device) {
         found_device = true;
     }
 
-    printf("[....] Using %s (%s).\n", CFStringGetCStringPtr(device_full_name, kCFStringEncodingASCII), CFStringGetCStringPtr(found_device_id, kCFStringEncodingASCII));
+    printf("[....] Using %s.\n", CFStringGetCStringPtr(device_full_name, kCFStringEncodingASCII));
 
     if (command_only) {
         if (strcmp("list", command) == 0) {
