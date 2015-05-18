@@ -445,13 +445,9 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
 
     if (verbose)
     {
-      char *devName = MYCFStringCopyUTF8String(device_name);
-      CFShow([NSString stringWithFormat:@"Device Name: %s\n", devName]);
-      free(devName);
+      printf("Device Name: %s\n", CFStringGetCStringPtr(device_name, kCFStringEncodingASCII));
 
-      char *mdlName = MYCFStringCopyUTF8String(model_name);
-      CFShow([NSString stringWithFormat:@"Model Name: %s\n", mdlName]);
-      free(mdlName);
+      printf("Model Name: %s\n", CFStringGetCStringPtr(model_name, kCFStringEncodingASCII));
     }
 
     if(device_name != NULL && model_name != NULL)
@@ -1268,7 +1264,7 @@ void* read_file_to_memory(char * path, size_t* file_size)
     *file_size = buf.st_size;
     FILE* fd = fopen(path, "r");
     char* content = malloc(*file_size);
-    if (fread(content, *file_size, 1, fd) != 1)
+    if (*file_size != 0 && fread(content, *file_size, 1, fd) != 1)
     {
         fclose(fd);
         return NULL;
@@ -1291,8 +1287,7 @@ void list_files(AMDeviceRef device)
 int app_exists(AMDeviceRef device)
 {
     if (bundle_id == NULL) {
-        printf("Bundle id is not specified\n");
-        return 1;
+        on_error("Bundle id is not specified\n");
     }
     AMDeviceConnect(device);
     assert(AMDeviceIsPaired(device));
@@ -1547,7 +1542,7 @@ void uninstall_app(AMDeviceRef device) {
         if (code == 0) {
             printf("[ OK ] Uninstalled package with bundle id %s\n", CFStringGetCStringPtr(cf_uninstall_bundle_id, CFStringGetSystemEncoding()));
         } else {
-            printf("[ ERROR ] Could not uninstall package with bundle id %s\n", CFStringGetCStringPtr(cf_uninstall_bundle_id, CFStringGetSystemEncoding()));
+            on_error("Could not uninstall package with bundle id %s\n", CFStringGetCStringPtr(cf_uninstall_bundle_id, CFStringGetSystemEncoding()));
         }
         check_error(AMDeviceStopSession(device));
         check_error(AMDeviceDisconnect(device));
@@ -1563,7 +1558,7 @@ void handle_device(AMDeviceRef device) {
                 device_interface_name = get_device_interface_name(device);
                 
     if (detect_only) {
-        CFShow([NSString stringWithFormat:@"[....] Found %@ connected through %@.\n", device_full_name, device_interface_name]);
+        printf("[....] Found %s connected through %s.\n", CFStringGetCStringPtr(device_full_name, kCFStringEncodingASCII), CFStringGetCStringPtr(device_interface_name, kCFStringEncodingASCII));
         found_device = true;
         return;
     }
@@ -1573,7 +1568,7 @@ void handle_device(AMDeviceRef device) {
             found_device = true;
             CFRelease(deviceCFSTR);
         } else {
-            CFShow([NSString stringWithFormat:@"Skipping %@.\n", device_full_name]);
+            printf("[....] Skipping %s.\n", CFStringGetCStringPtr(device_full_name, kCFStringEncodingASCII));
             return;
         }
     } else {
@@ -1581,7 +1576,7 @@ void handle_device(AMDeviceRef device) {
         found_device = true;
     }
 
-    CFShow([NSString stringWithFormat:@"[....] Using %@ (%@).\n", device_full_name, found_device_id]);
+    printf("[....] Using %s.\n", CFStringGetCStringPtr(device_full_name, kCFStringEncodingASCII));
 
     if (command_only) {
         if (strcmp("list", command) == 0) {
@@ -1637,7 +1632,7 @@ void handle_device(AMDeviceRef device) {
             if (code == 0) {
                 printf("[ OK ] Uninstalled package with bundle id %s\n", CFStringGetCStringPtr(cf_uninstall_bundle_id, CFStringGetSystemEncoding()));
             } else {
-                printf("[ ERROR ] Could not uninstall package with bundle id %s\n", CFStringGetCStringPtr(cf_uninstall_bundle_id, CFStringGetSystemEncoding()));
+                on_error("Could not uninstall package with bundle id %s\n", CFStringGetCStringPtr(cf_uninstall_bundle_id, CFStringGetSystemEncoding()));
             }
             check_error(AMDeviceStopSession(device));
             check_error(AMDeviceDisconnect(device));
@@ -1646,7 +1641,7 @@ void handle_device(AMDeviceRef device) {
 
     if(install) {
         printf("------ Install phase ------\n");
-        CFShow([NSString stringWithFormat:@"[  0%%] Found %@ connected through %@, beginning install\n", device_full_name, device_interface_name]);
+        printf("[  0%%] Found %s connected through %s, beginning install\n", CFStringGetCStringPtr(device_full_name, kCFStringEncodingASCII), CFStringGetCStringPtr(device_interface_name, kCFStringEncodingASCII));
 
         AMDeviceConnect(device);
         assert(AMDeviceIsPaired(device));
