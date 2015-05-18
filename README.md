@@ -57,7 +57,7 @@ This will install ios-deploy in the `bin` folder of `/usr/local`, i.e. `/usr/loc
       -R, --rm <path>              remove file or directory on device (directories must be empty)
       -V, --version                print the executable version
       -e, --exists                 check if the app with given bundle_id is installed or not
-
+      -B, --list_bundle_id         list bundle_id
 
 ## Examples
 
@@ -95,6 +95,9 @@ The commands below assume that you have an app called `my.app` with bundle id `b
     
     // Uninstall an app
     ios-deploy --uninstall_only --bundle_id my.bundle.id
+    
+    // list all bundle ids of all apps on your device
+    ios-deploy --list_bundle_id
 
 ## Demo
 

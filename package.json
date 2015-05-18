@@ -1,6 +1,6 @@
 {
   "name": "ios-deploy",
-  "version": "1.6.2",
+  "version": "1.7.0",
   "os" : [ "darwin" ],
   "description": "launch iOS apps iOS devices from the command line (Xcode 6)",
   "main": "ios-deploy",
