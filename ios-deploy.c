@@ -1264,7 +1264,7 @@ void* read_file_to_memory(char * path, size_t* file_size)
     *file_size = buf.st_size;
     FILE* fd = fopen(path, "r");
     char* content = malloc(*file_size);
-    if (fread(content, *file_size, 1, fd) != 1)
+    if (*file_size != 0 && fread(content, *file_size, 1, fd) != 1)
     {
         fclose(fd);
         return NULL;
