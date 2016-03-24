@@ -33,12 +33,17 @@ def run_command(debugger, command, result, internal_dict):
     error = lldb.SBError()
     lldb.target.modules[0].SetPlatformFileSpec(lldb.SBFileSpec(device_app))
     lldb.target.Launch(lldb.SBLaunchInfo(shlex.split(args[1] and args[1] or '{args}')), error)
-    lockedstr = ': Locked'
-    if lockedstr in str(error):
-       print('\\nDevice Locked\\n')
-       os._exit(254)
+    locked_str = ': Locked'
+    success_str = 'success'
+
+    if success_str in str(error):
+        print(str(error))
+    elif locked_str in str(error):
+        print('\\nDevice Locked\\n')
+        os._exit(254)
     else:
-       print(str(error))
+        print(str(error))
+        os._exit(1)
 
 def safequit_command(debugger, command, result, internal_dict):
     process = lldb.target.process
