@@ -42,20 +42,13 @@ def run_command(debugger, command, result, internal_dict):
 
 def safequit_command(debugger, command, result, internal_dict):
     process = lldb.target.process
-    listener = debugger.GetListener()
-    listener.StartListeningForEvents(process.GetBroadcaster(), lldb.SBProcess.eBroadcastBitStateChanged | lldb.SBProcess.eBroadcastBitSTDOUT | lldb.SBProcess.eBroadcastBitSTDERR)
-    event = lldb.SBEvent()
-    while True:
-        if listener.WaitForEvent(1, event) and lldb.SBProcess.EventIsProcessEvent(event):
-            state = lldb.SBProcess.GetStateFromEvent(event)
-        else:
-            state = process.GetState()
+    state = process.GetState()
 
-        if state == lldb.eStateRunning:
-            process.Detach()
-            os._exit(0)
-        elif state > lldb.eStateRunning:
-            os._exit(state)
+    if state == lldb.eStateRunning:
+        process.Detach()
+        os._exit(0)
+    elif state > lldb.eStateRunning:
+        os._exit(state)
 
 def autoexit_command(debugger, command, result, internal_dict):
     process = lldb.target.process
