@@ -43,12 +43,14 @@ def run_command(debugger, command, result, internal_dict):
 def safequit_command(debugger, command, result, internal_dict):
     process = lldb.target.process
     state = process.GetState()
-
     if state == lldb.eStateRunning:
         process.Detach()
         os._exit(0)
     elif state > lldb.eStateRunning:
         os._exit(state)
+    else:
+        print('\\nApplication has not been launched\\n')
+        os._exit(1)
 
 def autoexit_command(debugger, command, result, internal_dict):
     process = lldb.target.process
