@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		7E428A201DB99C1F00F86041 /* locations.m in Sources */ = {isa = PBXBuildFile; fileRef = 7E428A1E1DB99C1F00F86041 /* locations.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
+		7E428A211DB99C1F00F86041 /* locations.m in Sources */ = {isa = PBXBuildFile; fileRef = 7E428A1E1DB99C1F00F86041 /* locations.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
+		7E428A221DB99C1F00F86041 /* locations.h in Headers */ = {isa = PBXBuildFile; fileRef = 7E428A1F1DB99C1F00F86041 /* locations.h */; };
+		7E428A251DB99F2600F86041 /* logging.m in Sources */ = {isa = PBXBuildFile; fileRef = 7E428A231DB99F2600F86041 /* logging.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
+		7E428A261DB99F2600F86041 /* logging.m in Sources */ = {isa = PBXBuildFile; fileRef = 7E428A231DB99F2600F86041 /* logging.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
+		7E428A271DB99F2600F86041 /* logging.h in Headers */ = {isa = PBXBuildFile; fileRef = 7E428A241DB99F2600F86041 /* logging.h */; };
 		7E70899E1B587F29004D23AA /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E70899D1B587F29004D23AA /* CoreFoundation.framework */; };
 		7E7089A01B58801E004D23AA /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E70899F1B58801E004D23AA /* Foundation.framework */; };
 		7E8E3A861C45D4CE0017F6C1 /* ios_deploy_tests.m in Sources */ = {isa = PBXBuildFile; fileRef = 7E8E3A851C45D4CE0017F6C1 /* ios_deploy_tests.m */; };
@@ -38,6 +44,10 @@
 		7E1C00CC1C3C93AF00D686B5 /* version.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = version.h; sourceTree = "<group>"; };
 		7E1C00CF1C3C9ABB00D686B5 /* lldb.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; name = lldb.py; path = src/scripts/lldb.py; sourceTree = SOURCE_ROOT; };
 		7E1C00D11C3C9CB000D686B5 /* lldb.py.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = lldb.py.h; sourceTree = "<group>"; };
+		7E428A1E1DB99C1F00F86041 /* locations.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = locations.m; sourceTree = "<group>"; };
+		7E428A1F1DB99C1F00F86041 /* locations.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = locations.h; sourceTree = "<group>"; };
+		7E428A231DB99F2600F86041 /* logging.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = logging.m; sourceTree = "<group>"; };
+		7E428A241DB99F2600F86041 /* logging.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = logging.h; sourceTree = "<group>"; };
 		7E70898E1B587BF3004D23AA /* ios-deploy */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "ios-deploy"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7E7089991B587DE4004D23AA /* ios-deploy.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "ios-deploy.m"; sourceTree = "<group>"; };
 		7E70899A1B587DE4004D23AA /* errors.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = errors.h; sourceTree = "<group>"; };
@@ -151,6 +161,10 @@
 			children = (
 				7E8E3A911C45D5380017F6C1 /* libios_deploy.h */,
 				7E8E3A931C45D5380017F6C1 /* libios_deploy.m */,
+				7E428A1E1DB99C1F00F86041 /* locations.m */,
+				7E428A1F1DB99C1F00F86041 /* locations.h */,
+				7E428A231DB99F2600F86041 /* logging.m */,
+				7E428A241DB99F2600F86041 /* logging.h */,
 			);
 			name = "ios-deploy-lib";
 			path = "src/ios-deploy-lib";
@@ -164,6 +178,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				7E8E3A921C45D5380017F6C1 /* libios_deploy.h in Headers */,
+				7E428A271DB99F2600F86041 /* logging.h in Headers */,
+				7E428A221DB99C1F00F86041 /* locations.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -302,6 +318,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7E428A211DB99C1F00F86041 /* locations.m in Sources */,
+				7E428A261DB99F2600F86041 /* logging.m in Sources */,
 				7E8E3A941C45D5380017F6C1 /* libios_deploy.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -310,6 +328,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7E428A201DB99C1F00F86041 /* locations.m in Sources */,
+				7E428A251DB99F2600F86041 /* logging.m in Sources */,
 				7EDCC3CD1C45DC94002F9851 /* ios-deploy.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -17,6 +17,9 @@
 
 #include "MobileDevice.h"
 #include "errors.h"
+#include "logging.h"
+#include "locations.h"
+
 
 #define PREP_CMDS_PATH @"/tmp/%@/fruitstrap-lldb-prep-cmds-"
 #define LLDB_SHELL @"lldb -s %@"
@@ -98,69 +101,6 @@ AMDeviceRef best_device_match = NULL;
 NSString* tmpUUID;
 struct am_device_notification *notify;
 
-// Error codes we report on different failures, so scripts can distinguish between user app exit
-// codes and our exit codes. For non app errors we use codes in reserved 128-255 range.
-const int exitcode_error = 253;
-const int exitcode_app_crash = 254;
-
-// Checks for MobileDevice.framework errors, tries to print them and exits.
-#define check_error(call)                                                       \
-    do {                                                                        \
-        unsigned int err = (unsigned int)call;                                  \
-        if (err != 0)                                                           \
-        {                                                                       \
-            const char* msg = get_error_message(err);                           \
-            /*on_error("Error 0x%x: %s " #call, err, msg ? msg : "unknown.");*/    \
-            on_error(@"Error 0x%x: %@ " #call, err, msg ? [NSString stringWithUTF8String:msg] : @"unknown."); \
-        }                                                                       \
-    } while (false);
-
-void on_error(NSString* format, ...)
-{
-    va_list valist;
-    va_start(valist, format);
-    NSString* str = [[[NSString alloc] initWithFormat:format arguments:valist] autorelease];
-    va_end(valist);
-
-    NSLog(@"[ !! ] %@", str);
-
-    exit(exitcode_error);
-}
-
-// Print error message getting last errno and exit
-void on_sys_error(NSString* format, ...) {
-    const char* errstr = strerror(errno);
-
-    va_list valist;
-    va_start(valist, format);
-    NSString* str = [[[NSString alloc] initWithFormat:format arguments:valist] autorelease];
-    va_end(valist);
-
-    on_error(@"%@ : %@", str, [NSString stringWithUTF8String:errstr]);
-}
-
-void __NSLogOut(NSString* format, va_list valist) {
-    NSString* str = [[[NSString alloc] initWithFormat:format arguments:valist] autorelease];
-    [[str stringByAppendingString:@"\n"] writeToFile:@"/dev/stdout" atomically:NO encoding:NSUTF8StringEncoding error:nil];
-}
-
-void NSLogOut(NSString* format, ...) {
-    va_list valist;
-    va_start(valist, format);
-    __NSLogOut(format, valist);
-    va_end(valist);
-}
-
-void NSLogVerbose(NSString* format, ...) {
-    if (verbose) {
-        va_list valist;
-        va_start(valist, format);
-        __NSLogOut(format, valist);
-        va_end(valist);
-    }
-}
-
-
 BOOL mkdirp(NSString* path) {
     NSError* error = nil;
     BOOL success = [[NSFileManager defaultManager] createDirectoryAtPath:path
@@ -170,123 +110,10 @@ BOOL mkdirp(NSString* path) {
     return success;
 }
 
-Boolean path_exists(CFTypeRef path) {
-    if (CFGetTypeID(path) == CFStringGetTypeID()) {
-        CFURLRef url = CFURLCreateWithFileSystemPath(NULL, path, kCFURLPOSIXPathStyle, true);
-        Boolean result = CFURLResourceIsReachable(url, NULL);
-        CFRelease(url);
-        return result;
-    } else if (CFGetTypeID(path) == CFURLGetTypeID()) {
-        return CFURLResourceIsReachable(path, NULL);
-    } else {
-        return false;
-    }
-}
-
-CFStringRef find_path(CFStringRef rootPath, CFStringRef namePattern, CFStringRef expression) {
-    FILE *fpipe = NULL;
-    CFStringRef cf_command;
-    CFRange slashLocation;
-
-    slashLocation = CFStringFind(namePattern, CFSTR("/"), 0);
-    if (slashLocation.location == kCFNotFound) {
-        cf_command = CFStringCreateWithFormat(NULL, NULL, CFSTR("find %@ -name '%@' %@ 2>/dev/null | sort | tail -n 1"), rootPath, namePattern, expression);
-    } else {
-        cf_command = CFStringCreateWithFormat(NULL, NULL, CFSTR("find %@ -path '%@' %@ 2>/dev/null | sort | tail -n 1"), rootPath, namePattern, expression);
-    }
-
-    char command[1024] = { '\0' };
-    CFStringGetCString(cf_command, command, sizeof(command), kCFStringEncodingUTF8);
-    CFRelease(cf_command);
-
-    if (!(fpipe = (FILE *)popen(command, "r")))
-        on_sys_error(@"Error encountered while opening pipe");
-
-    char buffer[256] = { '\0' };
-
-    fgets(buffer, sizeof(buffer), fpipe);
-    pclose(fpipe);
-
-    strtok(buffer, "\n");
-    return CFStringCreateWithCString(NULL, buffer, kCFStringEncodingUTF8);
-}
-
 CFStringRef copy_long_shot_disk_image_path() {
     return find_path(CFSTR("`xcode-select --print-path`"), CFSTR("DeveloperDiskImage.dmg"), CFSTR(""));
 }
 
-CFStringRef copy_xcode_dev_path() {
-    static char xcode_dev_path[256] = { '\0' };
-    if (strlen(xcode_dev_path) == 0) {
-        FILE *fpipe = NULL;
-        char *command = "xcode-select -print-path";
-
-        if (!(fpipe = (FILE *)popen(command, "r")))
-            on_sys_error(@"Error encountered while opening pipe");
-
-        char buffer[256] = { '\0' };
-
-        fgets(buffer, sizeof(buffer), fpipe);
-        pclose(fpipe);
-
-        strtok(buffer, "\n");
-        strcpy(xcode_dev_path, buffer);
-    }
-    return CFStringCreateWithCString(NULL, xcode_dev_path, kCFStringEncodingUTF8);
-}
-
-const char *get_home() {
-    const char* home = getenv("HOME");
-    if (!home) {
-        struct passwd *pwd = getpwuid(getuid());
-        home = pwd->pw_dir;
-    }
-    return home;
-}
-
-CFStringRef copy_xcode_path_for(CFStringRef subPath, CFStringRef search) {
-    CFStringRef xcodeDevPath = copy_xcode_dev_path();
-    CFStringRef path = NULL;
-    bool found = false;
-    const char* home = get_home();
-    CFRange slashLocation;
-
-
-    // Try using xcode-select --print-path
-    if (!found) {
-        path = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/%@/%@"), xcodeDevPath, subPath, search);
-        found = path_exists(path);
-    }
-    // Try find `xcode-select --print-path` with search as a name pattern
-    if (!found) {
-        slashLocation = CFStringFind(search, CFSTR("/"), 0);
-        if (slashLocation.location == kCFNotFound) {
-        path = find_path(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/%@"), xcodeDevPath, subPath), search, CFSTR("-maxdepth 1"));
-        } else {
-             path = find_path(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/%@"), xcodeDevPath, subPath), search, CFSTR(""));
-        }
-        found = CFStringGetLength(path) > 0 && path_exists(path);
-    }
-    // If not look in the default xcode location (xcode-select is sometimes wrong)
-    if (!found) {
-        path = CFStringCreateWithFormat(NULL, NULL, CFSTR("/Applications/Xcode.app/Contents/Developer/%@&%@"), subPath, search);
-        found = path_exists(path);
-    }
-    // If not look in the users home directory, Xcode can store device support stuff there
-    if (!found) {
-        path = CFStringCreateWithFormat(NULL, NULL, CFSTR("%s/Library/Developer/Xcode/%@/%@"), home, subPath, search);
-        found = path_exists(path);
-    }
-
-    CFRelease(xcodeDevPath);
-
-    if (found) {
-        return path;
-    } else {
-        CFRelease(path);
-        return NULL;
-    }
-}
 
 #define GET_FRIENDLY_MODEL_NAME(VALUE, INTERNAL_NAME, FRIENDLY_NAME)  if (kCFCompareEqualTo  == CFStringCompare(VALUE, CFSTR(INTERNAL_NAME), kCFCompareNonliteral)) { return CFSTR( FRIENDLY_NAME); };
 
