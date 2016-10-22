@@ -1,4 +1,6 @@
 #include <stdio.h>
+
+#import "errors.h"
 #import <Foundation/Foundation.h>
 
 // Error codes we report on different failures, so scripts can distinguish between user app exit
@@ -24,3 +26,5 @@ void on_sys_error(NSString* format, ...); // Print error message getting last er
 void __NSLogOut(NSString* format, va_list valist);
 void NSLogOut(NSString* format, ...);
 void NSLogVerbose(NSString* format, ...);
+
+void setVerboseLog(BOOL verbose);

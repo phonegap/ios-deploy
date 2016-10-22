@@ -1,9 +1,11 @@
-#include "logging.h"
+#import "logging.h"
 
 // Error codes we report on different failures, so scripts can distinguish between user app exit
 // codes and our exit codes. For non app errors we use codes in reserved 128-255 range.
 const int exitcode_error = 253;
 const int exitcode_app_crash = 254;
+BOOL gVerboseLog = 0;
+
 
 // Checks for MobileDevice.framework errors, tries to print them and exits.
 #define check_error(call)                                                       \
@@ -53,9 +55,13 @@ void NSLogOut(NSString* format, ...) {
     va_end(valist);
 }
 
+void setVerboseLog(BOOL verbose) {
+    gVerboseLog = verbose;
+}
+
 void NSLogVerbose(NSString* format, ...) {
     // TODO:
-    if (0/*verbose*/) {
+    if (gVerboseLog) {
         va_list valist;
         va_start(valist, format);
         __NSLogOut(format, valist);

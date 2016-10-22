@@ -1,8 +1,9 @@
 #import "locations.h"
 #import "logging.h"
+#import "util.h"
 #include <pwd.h>
 
-CFStringRef copy_device_support_path_x(CFStringRef deviceClass,
+CFStringRef copy_device_support_path(CFStringRef deviceClass,
                                      CFStringRef build,
                                      CFStringRef version) {
     
@@ -50,6 +51,61 @@ CFStringRef copy_device_support_path_x(CFStringRef deviceClass,
     CFRelease(version_parts);
     if (path == NULL)
         on_error(@"Unable to locate DeviceSupport directory. This probably means you don't have Xcode installed, you will need to launch the app manually and logging output will not be shown!");
+    
+    return path;
+}
+
+CFStringRef copy_developer_disk_image_path(CFStringRef deviceClass,
+                                           CFStringRef build,
+                                           CFStringRef version) {
+    
+    CFStringRef path = NULL;
+    CFArrayRef parts = CFStringCreateArrayBySeparatingStrings(NULL, version, CFSTR("."));
+    CFMutableArrayRef version_parts = CFArrayCreateMutableCopy(NULL, CFArrayGetCount(parts), parts);
+    
+    NSLogVerbose(@"Device Class: %@", deviceClass);
+    NSLogVerbose(@"build: %@", build);
+    CFStringRef deviceClassPath_platform;
+    CFStringRef deviceClassPath_alt;
+    if (CFStringCompare(CFSTR("AppleTV"), deviceClass, 0) == kCFCompareEqualTo) {
+        deviceClassPath_platform = CFSTR("Platforms/AppleTVOS.platform/DeviceSupport");
+        deviceClassPath_alt = CFSTR("tvOS\\ DeviceSupport");
+    } else {
+        deviceClassPath_platform = CFSTR("Platforms/iPhoneOS.platform/DeviceSupport");
+        deviceClassPath_alt = CFSTR("iOS\\ DeviceSupport");
+    }
+    // path = getPathForTVOS(device);
+    while (CFArrayGetCount(version_parts) > 0) {
+        version = CFStringCreateByCombiningStrings(NULL, version_parts, CFSTR("."));
+        NSLogVerbose(@"version: %@", version);
+        
+        if (path == NULL) {
+            path = copy_xcode_path_for(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/%@\\ \\(%@\\)"), deviceClassPath_alt, version, build), CFSTR("DeveloperDiskImage.dmg"));
+        }
+        if (path == NULL) {
+            path = copy_xcode_path_for(deviceClassPath_platform, CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@)/DeveloperDiskImage.dmg"), version, build));
+        }
+        if (path == NULL) {
+            path = copy_xcode_path_for(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/%@\\ \\(*\\)"), deviceClassPath_platform, version), CFSTR("DeveloperDiskImage.dmg"));
+        }
+        if (path == NULL) {
+            path = copy_xcode_path_for(deviceClassPath_platform, CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/DeveloperDiskImage.dmg"), version));
+        }
+        if (path == NULL) {
+            path = copy_xcode_path_for(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/Latest"), deviceClassPath_platform), CFSTR("/DeveloperDiskImage.dmg"));
+        }
+        CFRelease(version);
+        if (path != NULL) {
+            break;
+        }
+        CFArrayRemoveValueAtIndex(version_parts, CFArrayGetCount(version_parts) - 1);
+    }
+    
+    CFRelease(version_parts);
+    CFRelease(build);
+    CFRelease(deviceClass);
+    if (path == NULL)
+        on_error(@"Unable to locate DeveloperDiskImage.dmg. This probably means you don't have Xcode installed, you will need to launch the app manually and logging output will not be shown!");
     
     return path;
 }
@@ -155,16 +211,7 @@ CFStringRef find_path(CFStringRef rootPath, CFStringRef namePattern, CFStringRef
     return CFStringCreateWithCString(NULL, buffer, kCFStringEncodingUTF8);
 }
 
-Boolean path_exists(CFTypeRef path) {
-    if (CFGetTypeID(path) == CFStringGetTypeID()) {
-        CFURLRef url = CFURLCreateWithFileSystemPath(NULL, path, kCFURLPOSIXPathStyle, true);
-        Boolean result = CFURLResourceIsReachable(url, NULL);
-        CFRelease(url);
-        return result;
-    } else if (CFGetTypeID(path) == CFURLGetTypeID()) {
-        return CFURLResourceIsReachable(path, NULL);
-    } else {
-        return false;
-    }
+CFStringRef copy_long_shot_disk_image_path() {
+    return find_path(CFSTR("`xcode-select --print-path`"), CFSTR("DeveloperDiskImage.dmg"), CFSTR(""));
 }
 
