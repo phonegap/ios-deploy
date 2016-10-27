@@ -15,28 +15,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
-#include "MobileDevice.h"
-#import "appinfo.h"
-#import "logging.h"
-#import "locations.h"
-#import "device.h"
-#import "structs.h"
-#import "process.h"
-#import "util.h"
-#import "lldb.h"
-#import "flags.h"
-#import "util.h"
-
-#import "command-list.h"
-#import "command-list_bundle_id.h"
-#import "command-upload.h"
-#import "command-download.h"
-#import "command-mkdir.h"
-#import "command-rm.h"
-#import "command-exists.h"
-#import "command-uninstall_only.h"
-#import "command-uninstall.h"
-#import "command-install.h"
+#import "ios-deploy-lib.h"
 
 
 AppData gAppData;
