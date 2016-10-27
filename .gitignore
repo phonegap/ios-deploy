@@ -4,3 +4,4 @@ node_modules/*
 *~
 src/scripts/lldb.pyc
 src/ios-deploy/lldb.py.h
+xcuserdata
