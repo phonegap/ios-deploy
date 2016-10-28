@@ -27,6 +27,9 @@ CFStringRef copy_developer_disk_image_path_for_device(AMDeviceRef device) {
     CFStringRef version = AMDeviceCopyValue(device, 0, CFSTR("ProductVersion"));
     
     CFStringRef path = copy_developer_disk_image_path(deviceClass, build, version);
+    if (path == NULL) {
+        on_error(@"Unable to locate DeveloperDiskImage.dmg. This probably means you don't have Xcode installed, you will need to launch the app manually and logging output will not be shown!");
+    }
     
     CFRelease(version);
     CFRelease(deviceClass);

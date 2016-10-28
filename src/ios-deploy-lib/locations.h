@@ -22,10 +22,15 @@ CFStringRef copy_developer_disk_image_path(CFStringRef deviceClass,
                                            CFStringRef build,
                                            CFStringRef version
                                            );
-CFStringRef copy_developer_disk_image_path_for_dev_path(CFStringRef deviceClass,
+CFStringRef copy_developer_disk_image_path_for_dev_path_and_home(
+                                           CFStringRef deviceClass,
                                            CFStringRef build,
                                            CFStringRef version,
-                                           CFStringRef xcodeDevPath);
+                                           CFStringRef xcodeDevPath,
+                                           CFStringRef homePath,
+                                           FindPathBlock findPathBlock,
+                                           PathExistsBlock pathExistsBlock
+                                           );
 
 CFStringRef copy_xcode_path_for(CFStringRef subPath, CFStringRef search);
 CFStringRef copy_xcode_path_for_dev_path(CFStringRef subPath, CFStringRef search, CFStringRef xcodeDevPath);

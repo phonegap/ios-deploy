@@ -135,15 +135,27 @@ CFStringRef copy_developer_disk_image_path(CFStringRef deviceClass,
                                                         CFStringRef build,
                                                         CFStringRef version
                                                         ) {
-    return copy_developer_disk_image_path_for_dev_path(deviceClass, build, version, copy_xcode_dev_path());
-    
+    return copy_developer_disk_image_path_for_dev_path_and_home(deviceClass,
+                                                       build,
+                                                       version,
+                                                       copy_xcode_dev_path(),
+                                                       (CFStringRef)get_home(),
+                                                       ^CFStringRef(CFStringRef rootPath, CFStringRef namePattern, CFStringRef expression) {
+                                                           return find_path(rootPath, namePattern, expression);
+                                                       },
+                                                       ^BOOL(CFTypeRef ref) {
+                                                           return path_exists(ref);
+                                                       });
 }
 
 
-CFStringRef copy_developer_disk_image_path_for_dev_path(CFStringRef deviceClass,
+CFStringRef copy_developer_disk_image_path_for_dev_path_and_home(CFStringRef deviceClass,
                                            CFStringRef build,
                                            CFStringRef version,
-                                           CFStringRef xcodeDevPath) {
+                                           CFStringRef xcodeDevPath,
+                                           CFStringRef homePath,
+                                           FindPathBlock findPathBlock,
+                                           PathExistsBlock pathExistsBlock) {
     CFStringRef path = NULL;
     CFArrayRef parts = CFStringCreateArrayBySeparatingStrings(NULL, version, CFSTR("."));
     CFMutableArrayRef version_parts = CFArrayCreateMutableCopy(NULL, CFArrayGetCount(parts), parts);
@@ -165,19 +177,19 @@ CFStringRef copy_developer_disk_image_path_for_dev_path(CFStringRef deviceClass,
         NSLogVerbose(@"version: %@", version);
         
         if (path == NULL) {
-            path = copy_xcode_path_for_dev_path(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/%@\\ \\(%@\\)"), deviceClassPath_alt, version, build), CFSTR("DeveloperDiskImage.dmg"), xcodeDevPath);
+            path = copy_xcode_path_for_dev_path_and_home(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/%@\\ \\(%@\\)"), deviceClassPath_alt, version, build), CFSTR("DeveloperDiskImage.dmg"), xcodeDevPath, homePath, findPathBlock, pathExistsBlock);
         }
         if (path == NULL) {
-            path = copy_xcode_path_for_dev_path(deviceClassPath_platform, CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@)/DeveloperDiskImage.dmg"), version, build), xcodeDevPath);
+            path = copy_xcode_path_for_dev_path_and_home(deviceClassPath_platform, CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@)/DeveloperDiskImage.dmg"), version, build), xcodeDevPath, homePath, findPathBlock, pathExistsBlock);
         }
         if (path == NULL) {
-            path = copy_xcode_path_for_dev_path(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/%@\\ \\(*\\)"), deviceClassPath_platform, version), CFSTR("DeveloperDiskImage.dmg"), xcodeDevPath);
+            path = copy_xcode_path_for_dev_path_and_home(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/%@\\ \\(*\\)"), deviceClassPath_platform, version), CFSTR("DeveloperDiskImage.dmg"), xcodeDevPath, homePath, findPathBlock, pathExistsBlock);
         }
         if (path == NULL) {
-            path = copy_xcode_path_for_dev_path(deviceClassPath_platform, CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/DeveloperDiskImage.dmg"), version), xcodeDevPath);
+            path = copy_xcode_path_for_dev_path_and_home(deviceClassPath_platform, CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/DeveloperDiskImage.dmg"), version), xcodeDevPath, homePath, findPathBlock, pathExistsBlock);
         }
         if (path == NULL) {
-            path = copy_xcode_path_for_dev_path(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/Latest"), deviceClassPath_platform), CFSTR("/DeveloperDiskImage.dmg"), xcodeDevPath);
+            path = copy_xcode_path_for_dev_path_and_home(CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/Latest"), deviceClassPath_platform), CFSTR("DeveloperDiskImage.dmg"), xcodeDevPath, homePath, findPathBlock, pathExistsBlock);
         }
         CFRelease(version);
         if (path != NULL) {
@@ -189,8 +201,6 @@ CFStringRef copy_developer_disk_image_path_for_dev_path(CFStringRef deviceClass,
     CFRelease(version_parts);
     CFRelease(build);
     CFRelease(deviceClass);
-    if (path == NULL)
-        on_error(@"Unable to locate DeveloperDiskImage.dmg. This probably means you don't have Xcode installed, you will need to launch the app manually and logging output will not be shown!");
     
     return path;
 }
@@ -216,7 +226,6 @@ CFStringRef copy_xcode_path_for_dev_path_and_home(CFStringRef subPath, CFStringR
     CFStringRef path = NULL;
     bool found = false;
     CFRange slashLocation;
-    
     
     // Try using xcode-select --print-path
     if (!found) {
