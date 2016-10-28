@@ -72,7 +72,11 @@ CFStringRef copy_device_support_path(
                                       CFStringRef build,
                                       CFStringRef version
                                                   ) {
-    return copy_device_support_path_for_dev_path(deviceClass, build, version, copy_xcode_dev_path());
+    CFStringRef xcodeDevPath = copy_xcode_dev_path();
+    CFRetain(xcodeDevPath);
+    CFStringRef ret = copy_device_support_path_for_dev_path(deviceClass, build, version, xcodeDevPath);
+    CFRelease(xcodeDevPath);
+    return ret;
 }
 
 CFStringRef copy_device_support_path_for_dev_path(CFStringRef deviceClass,
@@ -135,7 +139,9 @@ CFStringRef copy_developer_disk_image_path(CFStringRef deviceClass,
                                                         CFStringRef build,
                                                         CFStringRef version
                                                         ) {
-    return copy_developer_disk_image_path_for_dev_path_and_home(deviceClass,
+    CFStringRef xcodeDevPath = copy_xcode_dev_path();
+    CFRetain(xcodeDevPath);
+    CFStringRef ret = copy_developer_disk_image_path_for_dev_path_and_home(deviceClass,
                                                        build,
                                                        version,
                                                        copy_xcode_dev_path(),
@@ -146,6 +152,8 @@ CFStringRef copy_developer_disk_image_path(CFStringRef deviceClass,
                                                        ^BOOL(CFTypeRef ref) {
                                                            return path_exists(ref);
                                                        });
+    CFRelease(xcodeDevPath);
+    return ret;
 }
 
 
@@ -208,7 +216,11 @@ CFStringRef copy_developer_disk_image_path_for_dev_path_and_home(CFStringRef dev
 #pragma mark copy_xcode_path_for
 
 CFStringRef copy_xcode_path_for(CFStringRef subPath, CFStringRef search) {
-    return copy_xcode_path_for_dev_path(subPath, search, copy_xcode_dev_path());
+    CFStringRef xcodeDevPath = copy_xcode_dev_path();
+    CFRetain(xcodeDevPath);
+    CFStringRef ret = copy_xcode_path_for_dev_path(subPath, search, copy_xcode_dev_path());
+    CFRelease(xcodeDevPath);
+    return ret;
 }
 
 
