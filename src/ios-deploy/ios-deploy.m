@@ -19,6 +19,7 @@
 #import "errors.h"
 #import "device_db.h"
 
+
 #define PREP_CMDS_PATH @"/tmp/%@/fruitstrap-lldb-prep-cmds-"
 #define LLDB_SHELL @"lldb -s %@"
 /*
@@ -1477,6 +1478,7 @@ void handle_device(AMDeviceRef device) {
                 device_interface_name = get_device_interface_name(device);
 
     if (detect_only) {
+
         NSLogOut(@"[....] Found %@ connected through %@.", device_full_name, device_interface_name);
         found_device = true;
         return;
@@ -1487,6 +1489,7 @@ void handle_device(AMDeviceRef device) {
             found_device = true;
             CFRelease(deviceCFSTR);
         } else {
+
             NSLogOut(@"Skipping %@.", device_full_name);
             return;
         }
@@ -1494,6 +1497,7 @@ void handle_device(AMDeviceRef device) {
         device_id = MYCFStringCopyUTF8String(found_device_id);
         found_device = true;
     }
+
 
     NSLogOut(@"[....] Using %@.", device_full_name);
 
@@ -1559,6 +1563,7 @@ void handle_device(AMDeviceRef device) {
     }
 
     if(install) {
+
         NSLogOut(@"------ Install phase ------");
         NSLogOut(@"[  0%%] Found %@ connected through %@, beginning install", device_full_name, device_interface_name);
 
