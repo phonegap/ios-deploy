@@ -1788,6 +1788,7 @@ int main(int argc, char *argv[]) {
             nostart = 1;
             break;
         case 'I':
+            install = 0;
             interactive = false;
             debug = 1;
             break;
