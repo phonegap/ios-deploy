@@ -1473,8 +1473,15 @@ void remove_path_recursively_conn(struct afc_connection *conn, char const *path)
     }
     
     iter_dir(conn, path, (iter_callback) remove_path_callback);
+    ret = AFCRemovePath(conn, path);
     
-    assert(AFCRemovePath(conn, path) == 0);
+    if (ret == 10)
+    {
+        // No permissions for deleting folder
+        NSLogVerbose(@"No permissions for delete %s", path);
+        return;
+    }
+    assert(ret == 0);
     
     NSLogVerbose(@"Deleted %s", path);
 }
