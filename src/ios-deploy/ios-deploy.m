@@ -90,6 +90,7 @@ char *device_id = NULL;
 char *args = NULL;
 char *list_root = NULL;
 int _timeout = 0;
+int _detectDeadlockTimeout = 0;
 int port = 0;    // 0 means "dynamically assigned"
 CFStringRef last_path = NULL;
 service_conn_t gdbfd;
@@ -104,6 +105,7 @@ struct am_device_notification *notify;
 
 // Error codes we report on different failures, so scripts can distinguish between user app exit
 // codes and our exit codes. For non app errors we use codes in reserved 128-255 range.
+const int exitcode_timeout = 252;
 const int exitcode_error = 253;
 const int exitcode_app_crash = 254;
 
@@ -304,7 +306,13 @@ device_desc get_device_desc(CFStringRef model) {
             }
         }
     }
-    return device_db[UNKNOWN_DEVICE_IDX];
+    
+    device_desc res = device_db[UNKNOWN_DEVICE_IDX];
+    
+    res.model = model;
+    res.name = model;
+    
+    return res;
 }
 
 char * MYCFStringCopyUTF8String(CFStringRef aString) {
@@ -431,6 +439,10 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
             
             if (path == NULL) {
                 path = copy_xcode_path_for(deviceClassPath[i], CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/%@"), version, suffix));
+            }
+
+            if (path == NULL) {
+                path = copy_xcode_path_for(deviceClassPath[i], CFStringCreateWithFormat(NULL, NULL, CFSTR("%@.*/%@"), version, suffix));
             }
         }
         
@@ -617,8 +629,13 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     CFMutableStringRef pmodule = CFStringCreateMutableCopy(NULL, 0, (CFStringRef)LLDB_FRUITSTRAP_MODULE);
 
     CFRange rangeLLDB = { 0, CFStringGetLength(pmodule) };
+    
     CFStringRef exitcode_app_crash_str = CFStringCreateWithFormat(NULL, NULL, CFSTR("%d"), exitcode_app_crash);
     CFStringFindAndReplace(pmodule, CFSTR("{exitcode_app_crash}"), exitcode_app_crash_str, rangeLLDB, 0);
+    rangeLLDB.length = CFStringGetLength(pmodule);
+    
+    CFStringRef detect_deadlock_timeout_str = CFStringCreateWithFormat(NULL, NULL, CFSTR("%d"), _detectDeadlockTimeout);
+    CFStringFindAndReplace(pmodule, CFSTR("{detect_deadlock_timeout}"), detect_deadlock_timeout_str, rangeLLDB, 0);
     rangeLLDB.length = CFStringGetLength(pmodule);
 
     if (args) {
@@ -1709,9 +1726,13 @@ void device_callback(struct am_device_notification_callback_info *info, void *ar
 
 void timeout_callback(CFRunLoopTimerRef timer, void *info) {
     if (found_device && (!detect_only)) {
+        // App running for too long
+        NSLog(@"[ !! ] App is running for too long");
+        exit(exitcode_timeout);
         return;
     } else if ((!found_device) && (!detect_only))  {
-        if(best_device_match != NULL) {
+        // Device not found timeout
+        if (best_device_match != NULL) {
             NSLogVerbose(@"Handling best device match.");
             handle_device(best_device_match);
 
@@ -1719,27 +1740,28 @@ void timeout_callback(CFRunLoopTimerRef timer, void *info) {
             best_device_match = NULL;
         }
 
-        if(!found_device)
+        if (!found_device)
             on_error(@"Timed out waiting for device.");
     }
     else
     {
-      if (!debug) {
-          NSLogOut(@"[....] No more devices found.");
-      }
+        // Device detection timeout
+        if (!debug) {
+            NSLogOut(@"[....] No more devices found.");
+        }
 
-      if (detect_only && !found_device) {
-          exit(exitcode_error);
-          return;
-      } else {
-          int mypid = getpid();
-          if ((parent != 0) && (parent == mypid) && (child != 0))
-          {
-              NSLogVerbose(@"Timeout. Killing child (%d) tree.", child);
-              kill_ptree(child, SIGHUP);
-          }
-      }
-      exit(0);
+        if (detect_only && !found_device) {
+            exit(exitcode_error);
+            return;
+        } else {
+            int mypid = getpid();
+            if ((parent != 0) && (parent == mypid) && (child != 0))
+            {
+                NSLogVerbose(@"Timeout. Killing child (%d) tree.", child);
+                kill_ptree(child, SIGHUP);
+            }
+        }
+        exit(0);
     }
 }
 
@@ -1772,7 +1794,8 @@ void usage(const char* app) {
         @"  -V, --version                print the executable version \n"
         @"  -e, --exists                 check if the app with given bundle_id is installed or not \n"
         @"  -B, --list_bundle_id         list bundle_id \n"
-        @"  -W, --no-wifi                ignore wifi devices\n",
+        @"  -W, --no-wifi                ignore wifi devices\n"
+        @"  --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds\n",
         [NSString stringWithUTF8String:app]);
 }
 
@@ -1818,9 +1841,10 @@ int main(int argc, char *argv[]) {
         { "exists", no_argument, NULL, 'e'},
         { "list_bundle_id", no_argument, NULL, 'B'},
         { "no-wifi", no_argument, NULL, 'W'},
+        { "detect_deadlocks", required_argument, NULL, 1000 },
         { NULL, 0, NULL, 0 },
     };
-    char ch;
+    int ch;
 
     while ((ch = getopt_long(argc, argv, "VmcdvunrILeD:R:T:i:b:a:t:g:x:p:1:2:o:l::w::9::B::W", longopts, NULL)) != -1)
     {
@@ -1926,6 +1950,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'W':
             no_wifi = true;
+            break;
+        case 1000:
+            _detectDeadlockTimeout = atoi(optarg);
             break;
         default:
             usage(argv[0]);

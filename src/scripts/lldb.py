@@ -1,7 +1,8 @@
-import lldb
+import time
 import os
 import sys
 import shlex
+import lldb
 
 listener = None
 
@@ -50,6 +51,11 @@ def run_command(debugger, command, result, internal_dict):
     launchInfo = lldb.SBLaunchInfo(args_arr)
     global listener
     launchInfo.SetListener(listener)
+    
+    #This env variable makes NSLog, CFLog and os_log messages get mirrored to stderr
+    #https://stackoverflow.com/a/39581193 
+    launchInfo.SetEnvironmentEntries(['OS_ACTIVITY_DT_MODE=enable'], True)
+    
     lldb.target.Launch(launchInfo, error)
     lockedstr = ': Locked'
     if lockedstr in str(error):
@@ -73,6 +79,9 @@ def safequit_command(debugger, command, result, internal_dict):
 def autoexit_command(debugger, command, result, internal_dict):
     global listener
     process = lldb.target.process
+
+    detectDeadlockTimeout = {detect_deadlock_timeout}
+    printBacktraceTime = time.time() + detectDeadlockTimeout if detectDeadlockTimeout > 0 else None
     
     # This line prevents internal lldb listener from processing STDOUT/STDERR messages. Without it, an order of log writes is incorrect sometimes
     debugger.GetListener().StopListeningForEvents(process.GetBroadcaster(), lldb.SBProcess.eBroadcastBitSTDOUT | lldb.SBProcess.eBroadcastBitSTDERR )
@@ -113,7 +122,7 @@ def autoexit_command(debugger, command, result, internal_dict):
         if state == lldb.eStateExited:
             sys.stdout.write( '\\nPROCESS_EXITED\\n' )
             os._exit(process.GetExitStatus())
-        elif state == lldb.eStateStopped:
+        elif printBacktraceTime is None and state == lldb.eStateStopped:
             sys.stdout.write( '\\nPROCESS_STOPPED\\n' )
             debugger.HandleCommand('bt')
             os._exit({exitcode_app_crash})
@@ -124,4 +133,10 @@ def autoexit_command(debugger, command, result, internal_dict):
         elif state == lldb.eStateDetached:
             sys.stdout.write( '\\nPROCESS_DETACHED\\n' )
             os._exit({exitcode_app_crash})
-
+        elif printBacktraceTime is not None and time.time() >= printBacktraceTime:
+            printBacktraceTime = None
+            sys.stdout.write( '\\nPRINT_BACKTRACE_TIMEOUT\\n' )
+            debugger.HandleCommand('process interrupt')
+            debugger.HandleCommand('bt all')
+            debugger.HandleCommand('continue')
+            printBacktraceTime = time.time() + 5

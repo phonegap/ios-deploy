@@ -92,6 +92,7 @@ If you are *not* using a node version manager like [nvm](https://github.com/crea
         -e, --exists                 check if the app with given bundle_id is installed or not 
         -B, --list_bundle_id         list bundle_id 
         -W, --no-wifi                ignore wifi devices
+        --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds
 
 ## Examples
 
@@ -142,3 +143,6 @@ The included demo.app represents the minimum required to get code running on iOS
 
 * `make demo.app` will generate the demo.app executable. If it doesn't compile, modify `IOS_SDK_VERSION` in the Makefile.
 * `make debug` will install demo.app and launch a LLDB session.
+
+## Notes
+* `--detect_deadlocks` can help to identify an exact state of application's threads in case of a deadlock. It works like this: The user specifies the amount of time ios-deploy runs the app as usual. When the timeout is elapsed ios-deploy starts to print call-stacks of all threads every 5 seconds and the app keeps running. Comparing threads' call-stacks between each other helps to identify the threads which were stuck.
