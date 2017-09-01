@@ -1,5 +1,6 @@
 build/*
 node_modules/*
+_Frameworks/*
 /.DS_Store
 *~
 src/scripts/lldb.pyc

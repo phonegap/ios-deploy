@@ -177,8 +177,10 @@
 			buildConfigurationList = 7E7089951B587BF3004D23AA /* Build configuration list for PBXNativeTarget "ios-deploy" */;
 			buildPhases = (
 				7EDCC3CF1C45E03B002F9851 /* ShellScript */,
+				C0CD3D981F59D20100F954DB /* ShellScript */,
 				7E70898B1B587BF3004D23AA /* Frameworks */,
 				7EDCC3CC1C45DC89002F9851 /* Sources */,
+				C0CD3D9B1F59DA8300F954DB /* Run Script */,
 			);
 			buildRules = (
 			);
@@ -194,9 +196,11 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 7E8E3A8A1C45D4CE0017F6C1 /* Build configuration list for PBXNativeTarget "ios-deploy-tests" */;
 			buildPhases = (
+				3BF32EF31F5A215300E1699B /* ShellScript */,
 				7E8E3A7F1C45D4CE0017F6C1 /* Sources */,
 				7E8E3A801C45D4CE0017F6C1 /* Frameworks */,
 				7E8E3A811C45D4CE0017F6C1 /* Resources */,
+				3BF32EF41F5A217100E1699B /* ShellScript */,
 			);
 			buildRules = (
 			);
@@ -276,6 +280,32 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		3BF32EF31F5A215300E1699B /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "mkdir -p \"${PROJECT_DIR}/_Frameworks\"\ncp -r /System/Library/PrivateFrameworks/MobileDevice.framework \"${PROJECT_DIR}/_Frameworks\"";
+		};
+		3BF32EF41F5A217100E1699B /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "rm -rf \"${PROJECT_DIR}/_Frameworks\"";
+		};
 		7EDCC3CF1C45E03B002F9851 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -288,6 +318,33 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "echo \"\\\"# AUTO-GENERATED - DO NOT MODIFY\\n\\\"\" > src/ios-deploy/lldb.py.h\nawk '{ print \"\\\"\"$0\"\\\\n\\\"\"}' src/scripts/lldb.py >> src/ios-deploy/lldb.py.h";
+		};
+		C0CD3D981F59D20100F954DB /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "mkdir -p \"${PROJECT_DIR}/_Frameworks\"\ncp -r /System/Library/PrivateFrameworks/MobileDevice.framework \"${PROJECT_DIR}/_Frameworks\"";
+		};
+		C0CD3D9B1F59DA8300F954DB /* Run Script */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Run Script";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "rm -rf \"${PROJECT_DIR}/_Frameworks\"";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -355,6 +412,10 @@
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/_Frameworks",
+				);
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -376,7 +437,6 @@
 				OTHER_LDFLAGS = (
 					"-framework",
 					MobileDevice,
-					"-F/System/Library/PrivateFrameworks",
 				);
 				SDKROOT = macosx;
 			};
@@ -405,6 +465,10 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/_Frameworks",
+				);
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -418,7 +482,6 @@
 				OTHER_LDFLAGS = (
 					"-framework",
 					MobileDevice,
-					"-F/System/Library/PrivateFrameworks",
 				);
 				SDKROOT = macosx;
 			};
@@ -471,11 +534,6 @@
 				EXECUTABLE_PREFIX = lib;
 				INSTALL_PATH = "";
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				OTHER_LDFLAGS = (
-					"-framework",
-					MobileDevice,
-					"-F/System/Library/PrivateFrameworks",
-				);
 				PRODUCT_NAME = "ios-deploy";
 				PUBLIC_HEADERS_FOLDER_PATH = "";
 			};
@@ -488,11 +546,6 @@
 				EXECUTABLE_PREFIX = lib;
 				INSTALL_PATH = "";
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				OTHER_LDFLAGS = (
-					"-framework",
-					MobileDevice,
-					"-F/System/Library/PrivateFrameworks",
-				);
 				PRODUCT_NAME = "ios-deploy";
 				PUBLIC_HEADERS_FOLDER_PATH = "";
 			};
