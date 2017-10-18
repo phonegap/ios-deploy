@@ -1662,6 +1662,10 @@ void device_callback(struct am_device_notification_callback_info *info, void *ar
 
 void timeout_callback(CFRunLoopTimerRef timer, void *info) {
     if (found_device && (!detect_only)) {
+        // Don't need to exit in the justlaunch mode
+        if (justlaunch)
+            return;
+
         // App running for too long
         NSLog(@"[ !! ] App is running for too long");
         exit(exitcode_timeout);
