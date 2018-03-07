@@ -1788,11 +1788,11 @@ int main(int argc, char *argv[]) {
     {
         switch (ch) {
         case 'm':
-            install = 0;
-            debug = 1;
+            install = false;
+            debug = true;
             break;
         case 'd':
-            debug = 1;
+            debug = true;
             break;
         case 'i':
             device_id = optarg;
@@ -1804,29 +1804,29 @@ int main(int argc, char *argv[]) {
             args = optarg;
             break;
         case 'v':
-            verbose = 1;
+            verbose = true;
             break;
         case 't':
             _timeout = atoi(optarg);
             break;
         case 'u':
-            unbuffered = 1;
+            unbuffered = true;
             break;
         case 'n':
-            nostart = 1;
+            nostart = true;
             break;
         case 'I':
             interactive = false;
-            debug = 1;
+            debug = true;
             break;
         case 'L':
             interactive = false;
             justlaunch = true;
-            debug = 1;
+            debug = true;
             break;
         case 'c':
             detect_only = true;
-            debug = 1;
+            debug = true;
             break;
         case 'V':
             show_version();
@@ -1835,7 +1835,7 @@ int main(int argc, char *argv[]) {
             port = atoi(optarg);
             break;
         case 'r':
-            uninstall = 1;
+            uninstall = true;
             break;
         case '9':
             command_only = true;
