@@ -75,7 +75,7 @@ int AMDeviceMountImage(AMDeviceRef device, CFStringRef image, CFDictionaryRef op
 mach_error_t AMDeviceLookupApplications(AMDeviceRef device, CFDictionaryRef options, CFDictionaryRef *result);
 int AMDeviceGetInterfaceType(struct am_device *device);
 
-bool found_device = false, debug = false, verbose = false, unbuffered = false, nostart = false, detect_only = false, install = true, uninstall = false, no_wifi = false;
+bool found_device = false, debug = false, verbose = false, unbuffered = false, nostart = false, debugserver_only = false, detect_only = false, install = true, uninstall = false, no_wifi = false;
 bool command_only = false;
 char *command = NULL;
 char const*target_filename = NULL;
@@ -921,7 +921,8 @@ void setup_lldb(AMDeviceRef device, CFURLRef url) {
 
     mount_developer_image(device);      // put debugserver on the device
     start_remote_debug_server(device);  // start debugserver
-    write_lldb_prep_cmds(device, url);   // dump the necessary lldb commands into a file
+    if (!debugserver_only)
+        write_lldb_prep_cmds(device, url);   // dump the necessary lldb commands into a file
 
     CFRelease(url);
 
@@ -1020,6 +1021,20 @@ void launch_debugger_and_exit(AMDeviceRef device, CFURLRef url) {
     } else {
         on_sys_error(@"Fork failed");
     }
+}
+
+void launch_debugserver_only(AMDeviceRef device, CFURLRef url)
+{
+    CFRetain(url);
+    setup_lldb(device,url);
+
+    CFStringRef bundle_identifier = copy_disk_app_identifier(url);
+    CFURLRef device_app_url = copy_device_app_url(device, bundle_identifier);
+    CFStringRef device_app_path = CFURLCopyFileSystemPath(device_app_url, kCFURLPOSIXPathStyle);
+    CFRelease(url);
+
+    NSLogOut(@"debugserver port: %d", port);
+    NSLogOut(@"App path: %@", device_app_path);
 }
 
 CFStringRef get_bundle_id(CFURLRef app_url)
@@ -1631,10 +1646,13 @@ void handle_device(AMDeviceRef device) {
     if (!debug)
         exit(0); // no debug phase
 
-    if (justlaunch)
+    if (justlaunch) {
         launch_debugger_and_exit(device, url);
-    else
+    } else if (debugserver_only) {
+        launch_debugserver_only(device, url);
+    } else {
         launch_debugger(device, url);
+    }
 }
 
 void device_callback(struct am_device_notification_callback_info *info, void *arg) {
@@ -1712,6 +1730,7 @@ void usage(const char* app) {
         @"  -t, --timeout <timeout>      number of seconds to wait for a device to be connected\n"
         @"  -u, --unbuffered             don't buffer stdout\n"
         @"  -n, --nostart                do not start the app when debugging\n"
+        @"  -N, --nolldb                 start debugserver only. do not run lldb\n"
         @"  -I, --noninteractive         start in non interactive mode (quit when app crashes or exits)\n"
         @"  -L, --justlaunch             just launch the app and exit lldb\n"
         @"  -v, --verbose                enable verbose output\n"
@@ -1757,6 +1776,7 @@ int main(int argc, char *argv[]) {
         { "timeout", required_argument, NULL, 't' },
         { "unbuffered", no_argument, NULL, 'u' },
         { "nostart", no_argument, NULL, 'n' },
+        { "nolldb", no_argument, NULL, 'N' },
         { "noninteractive", no_argument, NULL, 'I' },
         { "justlaunch", no_argument, NULL, 'L' },
         { "detect", no_argument, NULL, 'c' },
@@ -1780,7 +1800,7 @@ int main(int argc, char *argv[]) {
     };
     int ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunrILeD:R:i:b:a:t:g:x:p:1:2:o:l::w::9::B::W", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunNrILeD:R:i:b:a:t:g:x:p:1:2:o:l::w::9::B::W", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -1810,6 +1830,10 @@ int main(int argc, char *argv[]) {
             break;
         case 'n':
             nostart = 1;
+            break;
+        case 'N':
+            debugserver_only = true;
+            debug = true;
             break;
         case 'I':
             interactive = false;
