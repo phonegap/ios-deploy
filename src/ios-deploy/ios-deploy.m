@@ -27,35 +27,25 @@
  * log enable -v -f /Users/vargaz/lldb.log lldb all
  * log enable -v -f /Users/vargaz/gdb-remote.log gdb-remote all
  */
-#define LLDB_PREP_CMDS CFSTR("\
-    platform select remote-ios --sysroot '{symbols_path}'\n\
-    target create \"{disk_app}\"\n\
-    script fruitstrap_device_app=\"{device_app}\"\n\
-    script fruitstrap_connect_url=\"connect://127.0.0.1:{device_port}\"\n\
-    target modules search-paths add {modules_search_paths_pairs}\n\
-    command script import \"{python_file_path}\"\n\
-    command script add -f {python_command}.connect_command connect\n\
-    command script add -s asynchronous -f {python_command}.run_command run\n\
-    command script add -s asynchronous -f {python_command}.autoexit_command autoexit\n\
-    command script add -s asynchronous -f {python_command}.safequit_command safequit\n\
-    connect\n\
+NSString* LLDB_PREP_CMDS = @
+    #include "lldb_cmds.h"
+;
+
+#define LLDB_PREP_NO_CMDS CFSTR("")
+
+#define LLDB_PREP_INTERACTIVE_CMDS CFSTR("\
+    run\n\
 ")
 
-const char* lldb_prep_no_cmds = "";
-
-const char* lldb_prep_interactive_cmds = "\
-    run\n\
-";
-
-const char* lldb_prep_noninteractive_justlaunch_cmds = "\
+#define LLDB_PREP_NONINTERACTIVE_JUSTLAUNCH_CMDS CFSTR("\
     run\n\
     safequit\n\
-";
+")
 
-const char* lldb_prep_noninteractive_cmds = "\
+#define LLDB_PREP_NONINTERACTIVE_CMDS CFSTR("\
     run\n\
     autoexit\n\
-";
+")
 
 /*
  * Some things do not seem to work when using the normal commands like process connect/launch, so we invoke them
@@ -66,6 +56,8 @@ NSString* LLDB_FRUITSTRAP_MODULE = @
     #include "lldb.py.h"
 ;
 
+const char* custom_lldb_prep_cmds_path = NULL;
+const char* custom_lldb_script_path = NULL;
 
 typedef struct am_device * AMDeviceRef;
 mach_error_t AMDeviceSecureStartService(struct am_device *device, CFStringRef service_name, unsigned int *unknown, service_conn_t *handle);
@@ -618,13 +610,26 @@ CFStringRef copy_modules_search_paths_pairs(CFStringRef symbols_path, CFStringRe
 
 void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     CFStringRef symbols_path = copy_device_support_path(device, CFSTR("Symbols"));
-    CFMutableStringRef cmds = CFStringCreateMutableCopy(NULL, 0, LLDB_PREP_CMDS);
+
+    CFMutableStringRef cmds;
+    if (custom_lldb_prep_cmds_path) {
+        NSString * string = [NSString stringWithContentsOfFile:[NSString stringWithUTF8String:custom_lldb_prep_cmds_path] encoding:NSUTF8StringEncoding error:nil];
+        cmds = CFStringCreateMutableCopy(NULL, 0, (__bridge CFStringRef)string);
+    } else {
+        cmds = CFStringCreateMutableCopy(NULL, 0, (__bridge CFStringRef)LLDB_PREP_CMDS);
+    }
     CFRange range = { 0, CFStringGetLength(cmds) };
 
     CFStringFindAndReplace(cmds, CFSTR("{symbols_path}"), symbols_path, range, 0);
     range.length = CFStringGetLength(cmds);
 
-    CFMutableStringRef pmodule = CFStringCreateMutableCopy(NULL, 0, (CFStringRef)LLDB_FRUITSTRAP_MODULE);
+    CFMutableStringRef pmodule;
+    if (custom_lldb_script_path) {
+        NSString * string = [NSString stringWithContentsOfFile:[NSString stringWithUTF8String:custom_lldb_script_path] encoding:NSUTF8StringEncoding error:nil];
+        pmodule = CFStringCreateMutableCopy(NULL, 0, (__bridge CFStringRef)string);
+    } else {
+        pmodule = CFStringCreateMutableCopy(NULL, 0, (__bridge CFStringRef)LLDB_FRUITSTRAP_MODULE);
+    }
 
     CFRange rangeLLDB = { 0, CFStringGetLength(pmodule) };
     
@@ -701,6 +706,23 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     CFStringFindAndReplace(cmds, CFSTR("{python_file_path}"), (CFStringRef)python_file_path, range, 0);
     range.length = CFStringGetLength(cmds);
 
+    // Add extra commands
+    CFStringRef extra_cmds;
+    if (!interactive) {
+        if (justlaunch) {
+            extra_cmds = LLDB_PREP_NONINTERACTIVE_JUSTLAUNCH_CMDS;
+        } else {
+            extra_cmds = LLDB_PREP_NONINTERACTIVE_CMDS;
+        }
+    } else if (nostart) {
+        extra_cmds = LLDB_PREP_NO_CMDS;
+    } else {
+        extra_cmds = LLDB_PREP_INTERACTIVE_CMDS;
+    }
+    CFStringFindAndReplace(cmds, CFSTR("{run_commands}"), extra_cmds, range, 0);
+    range.length = CFStringGetLength(cmds);
+
+    // Write commands to temporary file
     CFDataRef cmds_data = CFStringCreateExternalRepresentation(NULL, cmds, kCFStringEncodingUTF8, 0);
     NSString* prep_cmds_path = [NSString stringWithFormat:PREP_CMDS_PATH, tmpUUID];
     if(device_id != NULL) {
@@ -708,22 +730,9 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     }
     FILE *out = fopen([prep_cmds_path UTF8String], "w");
     fwrite(CFDataGetBytePtr(cmds_data), CFDataGetLength(cmds_data), 1, out);
-    // Write additional commands based on mode we're running in
-    const char* extra_cmds;
-    if (!interactive)
-    {
-        if (justlaunch)
-          extra_cmds = lldb_prep_noninteractive_justlaunch_cmds;
-        else
-          extra_cmds = lldb_prep_noninteractive_cmds;
-    }
-    else if (nostart)
-        extra_cmds = lldb_prep_no_cmds;
-    else
-        extra_cmds = lldb_prep_interactive_cmds;
-    fwrite(extra_cmds, strlen(extra_cmds), 1, out);
     fclose(out);
 
+    // Write python script to temporary file
     CFDataRef pmodule_data = CFStringCreateExternalRepresentation(NULL, pmodule, kCFStringEncodingUTF8, 0);
 
     out = fopen([python_file_path UTF8String], "w");
@@ -1734,7 +1743,9 @@ void usage(const char* app) {
         @"  -e, --exists                 check if the app with given bundle_id is installed or not \n"
         @"  -B, --list_bundle_id         list bundle_id \n"
         @"  -W, --no-wifi                ignore wifi devices\n"
-        @"  --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds\n",
+        @"  --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds\n"
+        @"  --custom_prep_cmds <file>    use custom LLDB commands file for communication with the device\n"
+        @"  --custom_lldb_script <file>  use custom LLDB python script file for managing the process lifecycle\n",
         [NSString stringWithUTF8String:app]);
 }
 
@@ -1780,6 +1791,8 @@ int main(int argc, char *argv[]) {
         { "list_bundle_id", no_argument, NULL, 'B'},
         { "no-wifi", no_argument, NULL, 'W'},
         { "detect_deadlocks", required_argument, NULL, 1000 },
+        { "custom_prep_cmds", required_argument, NULL, 1001 },
+        { "custom_lldb_script", required_argument, NULL, 1002 },
         { NULL, 0, NULL, 0 },
     };
     int ch;
@@ -1885,6 +1898,12 @@ int main(int argc, char *argv[]) {
             break;
         case 1000:
             _detectDeadlockTimeout = atoi(optarg);
+            break;
+        case 1001:
+            custom_lldb_prep_cmds_path = optarg;
+            break;
+        case 1002:
+            custom_lldb_script_path = optarg;
             break;
         default:
             usage(argv[0]);
