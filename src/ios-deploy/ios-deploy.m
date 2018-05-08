@@ -32,6 +32,7 @@
     target create \"{disk_app}\"\n\
     script fruitstrap_device_app=\"{device_app}\"\n\
     script fruitstrap_connect_url=\"connect://127.0.0.1:{device_port}\"\n\
+    script fruitstrap_output_path=\"{output_path}\"\n\
     target modules search-paths add {modules_search_paths_pairs}\n\
     command script import \"{python_file_path}\"\n\
     command script add -f {python_command}.connect_command connect\n\
@@ -66,6 +67,7 @@ NSString* LLDB_FRUITSTRAP_MODULE = @
     #include "lldb.py.h"
 ;
 
+const char* output_path = NULL;
 
 typedef struct am_device * AMDeviceRef;
 mach_error_t AMDeviceSecureStartService(struct am_device *device, CFStringRef service_name, unsigned int *unknown, service_conn_t *handle);
@@ -665,6 +667,14 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
 
     CFStringRef device_port = CFStringCreateWithFormat(NULL, NULL, CFSTR("%d"), port);
     CFStringFindAndReplace(cmds, CFSTR("{device_port}"), device_port, range, 0);
+    range.length = CFStringGetLength(cmds);
+
+    if (output_path) {
+        CFStringRef output_path_str = CFStringCreateWithFormat(NULL, NULL, CFSTR("%s"), output_path);
+        CFStringFindAndReplace(cmds, CFSTR("{output_path}"), output_path_str, range, 0);
+    } else {
+        CFStringFindAndReplace(cmds, CFSTR("{output_path}"), CFSTR(""), range, 0);
+    }
     range.length = CFStringGetLength(cmds);
 
     CFURLRef device_container_url = CFURLCreateCopyDeletingLastPathComponent(NULL, device_app_url);
@@ -1734,6 +1744,7 @@ void usage(const char* app) {
         @"  -e, --exists                 check if the app with given bundle_id is installed or not \n"
         @"  -B, --list_bundle_id         list bundle_id \n"
         @"  -W, --no-wifi                ignore wifi devices\n"
+        @"  -O, --output <file>          write stdout and stderr to this file\n"
         @"  --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds\n",
         [NSString stringWithUTF8String:app]);
 }
@@ -1779,12 +1790,13 @@ int main(int argc, char *argv[]) {
         { "exists", no_argument, NULL, 'e'},
         { "list_bundle_id", no_argument, NULL, 'B'},
         { "no-wifi", no_argument, NULL, 'W'},
+        { "output", required_argument, NULL, 'O' },
         { "detect_deadlocks", required_argument, NULL, 1000 },
         { NULL, 0, NULL, 0 },
     };
     int ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunrILeD:R:i:b:a:t:g:x:p:1:2:o:l::w::9::B::W", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunrILeD:R:i:b:a:t:g:x:p:1:2:o:l::w::9::B::WO:", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -1882,6 +1894,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'W':
             no_wifi = true;
+            break;
+        case 'O':
+            output_path = optarg;
             break;
         case 1000:
             _detectDeadlockTimeout = atoi(optarg);
