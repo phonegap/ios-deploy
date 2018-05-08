@@ -36,6 +36,8 @@
 
 /* Begin PBXFileReference section */
 		7B28C98C1DC10655009569B6 /* device_db.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = device_db.h; sourceTree = "<group>"; };
+		7B757511209A0CE100B885EB /* lldb_cmds */ = {isa = PBXFileReference; lastKnownFileType = text; path = lldb_cmds; sourceTree = "<group>"; };
+		7BFA2AB8209B0CDD00A7DA2F /* lldb_cmds.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = lldb_cmds.h; sourceTree = "<group>"; };
 		7E1C00CC1C3C93AF00D686B5 /* version.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = version.h; sourceTree = "<group>"; };
 		7E1C00CF1C3C9ABB00D686B5 /* lldb.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; name = lldb.py; path = src/scripts/lldb.py; sourceTree = SOURCE_ROOT; };
 		7E1C00D11C3C9CB000D686B5 /* lldb.py.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = lldb.py.h; sourceTree = "<group>"; };
@@ -88,6 +90,7 @@
 			children = (
 				7EDCC3CE1C45DFF0002F9851 /* check_reqs.js */,
 				7E1C00CF1C3C9ABB00D686B5 /* lldb.py */,
+				7B757511209A0CE100B885EB /* lldb_cmds */,
 			);
 			name = scripts;
 			path = src/scripts;
@@ -119,6 +122,7 @@
 			isa = PBXGroup;
 			children = (
 				7E1C00D11C3C9CB000D686B5 /* lldb.py.h */,
+				7BFA2AB8209B0CDD00A7DA2F /* lldb_cmds.h */,
 				7E1C00CC1C3C93AF00D686B5 /* version.h */,
 				7E7089991B587DE4004D23AA /* ios-deploy.m */,
 				7E70899A1B587DE4004D23AA /* errors.h */,
@@ -177,6 +181,7 @@
 			buildConfigurationList = 7E7089951B587BF3004D23AA /* Build configuration list for PBXNativeTarget "ios-deploy" */;
 			buildPhases = (
 				7EDCC3CF1C45E03B002F9851 /* ShellScript */,
+				7B757512209A0D1E00B885EB /* ShellScript */,
 				C0CD3D981F59D20100F954DB /* ShellScript */,
 				7E70898B1B587BF3004D23AA /* Frameworks */,
 				7EDCC3CC1C45DC89002F9851 /* Sources */,
@@ -305,6 +310,19 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "rm -rf \"${PROJECT_DIR}/_Frameworks\"";
+		};
+		7B757512209A0D1E00B885EB /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "echo \"\\\"# AUTO-GENERATED - DO NOT MODIFY\\n\\\"\" > src/ios-deploy/lldb_cmds.h\nawk '{ print \"\\\"\"$0\"\\\\n\\\"\"}' src/scripts/lldb_cmds >> src/ios-deploy/lldb_cmds.h";
 		};
 		7EDCC3CF1C45E03B002F9851 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;

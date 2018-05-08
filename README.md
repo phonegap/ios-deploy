@@ -93,6 +93,8 @@ If you are *not* using a node version manager like [nvm](https://github.com/crea
         -B, --list_bundle_id         list bundle_id 
         -W, --no-wifi                ignore wifi devices
         --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds
+        --custom_prep_cmds <file>    use custom LLDB commands file for communication with the device
+        --custom_lldb_script <file>  use custom LLDB python script file for managing the process lifecycle
 
 ## Examples
 
@@ -136,6 +138,9 @@ The commands below assume that you have an app called `my.app` with bundle id `b
     
     // list all bundle ids of all apps on your device
     ios-deploy --list_bundle_id
+    
+    // deploy and launch your app to a connected device with a custom LLDB command file and python script
+    ios-deploy --noninteractive --bundle my.app --custom_prep_cmds lldb_cmds --custom_lldb_script lldb.py
 
 ## Demo
 
