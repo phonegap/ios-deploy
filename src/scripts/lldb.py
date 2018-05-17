@@ -62,6 +62,9 @@ def run_command(debugger, command, result, internal_dict):
     envs_arr = envs_arr + shlex.split('{envs}')
     launchInfo.SetEnvironmentEntries(envs_arr, True)
     
+    #This env variable enables launch time tracking for pre-main application state
+    launchInfo.SetEnvironmentEntries(['DYLD_PRINT_STATISTICS=1'], True)
+    
     lldb.target.Launch(launchInfo, startup_error)
     lockedstr = ': Locked'
     if lockedstr in str(startup_error):
