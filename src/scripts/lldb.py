@@ -85,6 +85,11 @@ def autoexit_command(debugger, command, result, internal_dict):
     if output_path:
         out = open(output_path, 'w')
 
+    error_path = internal_dict['fruitstrap_error_path']
+    err = None
+    if error_path:
+        err = open(error_path, 'w')
+
     detectDeadlockTimeout = {detect_deadlock_timeout}
     printBacktraceTime = time.time() + detectDeadlockTimeout if detectDeadlockTimeout > 0 else None
     
@@ -105,8 +110,8 @@ def autoexit_command(debugger, command, result, internal_dict):
     def ProcessSTDERR():
         stderr = process.GetSTDERR(1024)
         while stderr:
-            if out:
-                out.write(stdout)
+            if err:
+                err.write(stderr)
             else:
                 sys.stdout.write(stderr)
             stderr = process.GetSTDERR(1024)
@@ -114,6 +119,8 @@ def autoexit_command(debugger, command, result, internal_dict):
     def CloseOut():
         if (out):
             out.close()
+        if (err):
+            err.close()
     
     while True:
         if listener.WaitForEvent(1, event) and lldb.SBProcess.EventIsProcessEvent(event):
