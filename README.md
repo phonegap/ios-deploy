@@ -65,6 +65,7 @@ If you are *not* using a node version manager like [nvm](https://github.com/crea
         -c, --detect                 only detect if the device is connected
         -b, --bundle <bundle.app>    the path to the app bundle to be installed
         -a, --args <args>            command line arguments to pass to the app when launching it
+        -s, --envs <envs>            environment variables, space separated key-value pairs, to pass to the app when launching it
         -t, --timeout <timeout>      number of seconds to wait for a device to be connected
         -u, --unbuffered             don't buffer stdout
         -n, --nostart                do not start the app when debugging
@@ -94,6 +95,9 @@ The commands below assume that you have an app called `my.app` with bundle id `b
 
     // deploy and debug your app to a connected device
     ios-deploy --debug --bundle my.app
+
+    // deploy, debug and pass environment variables to a connected device
+    ios-deploy --debug --envs DYLD_PRINT_STATISTICS=1 --bundle my.app
 
     // deploy and debug your app to a connected device, skipping any wi-fi connection (use USB)
     ios-deploy --debug --bundle my.app --no-wifi

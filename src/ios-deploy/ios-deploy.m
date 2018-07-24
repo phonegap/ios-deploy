@@ -86,6 +86,7 @@ bool justlaunch = false;
 char *app_path = NULL;
 char *device_id = NULL;
 char *args = NULL;
+char *envs = NULL;
 char *list_root = NULL;
 int _timeout = 0;
 int _detectDeadlockTimeout = 0;
@@ -648,6 +649,22 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     } else {
         CFStringFindAndReplace(cmds, CFSTR("{args}"), CFSTR(""), range, 0);
         CFStringFindAndReplace(pmodule, CFSTR("{args}"), CFSTR(""), rangeLLDB, 0);
+        //printf("write_lldb_prep_cmds: [%s][%s]\n", CFStringGetCStringPtr (cmds,kCFStringEncodingMacRoman),
+        //    CFStringGetCStringPtr(pmodule, kCFStringEncodingMacRoman));
+    }
+
+    if (envs) {
+        CFStringRef cf_envs = CFStringCreateWithCString(NULL, envs, kCFStringEncodingUTF8);
+        CFStringFindAndReplace(cmds, CFSTR("{envs}"), cf_envs, range, 0);
+        rangeLLDB.length = CFStringGetLength(pmodule);
+        CFStringFindAndReplace(pmodule, CFSTR("{envs}"), cf_envs, rangeLLDB, 0);
+
+        //printf("write_lldb_prep_cmds:envs: [%s][%s]\n", CFStringGetCStringPtr (cmds,kCFStringEncodingMacRoman),
+        //    CFStringGetCStringPtr(pmodule, kCFStringEncodingMacRoman));
+        CFRelease(cf_envs);
+    } else {
+        CFStringFindAndReplace(cmds, CFSTR("{envs}"), CFSTR(""), range, 0);
+        CFStringFindAndReplace(pmodule, CFSTR("{envs}"), CFSTR(""), rangeLLDB, 0);
         //printf("write_lldb_prep_cmds: [%s][%s]\n", CFStringGetCStringPtr (cmds,kCFStringEncodingMacRoman),
         //    CFStringGetCStringPtr(pmodule, kCFStringEncodingMacRoman));
     }
@@ -1731,6 +1748,7 @@ void usage(const char* app) {
         @"  -c, --detect                 only detect if the device is connected\n"
         @"  -b, --bundle <bundle.app>    the path to the app bundle to be installed\n"
         @"  -a, --args <args>            command line arguments to pass to the app when launching it\n"
+        @"  -s, --envs <envs>            environment variables, space separated key-value pairs, to pass to the app when launching it\n"
         @"  -t, --timeout <timeout>      number of seconds to wait for a device to be connected\n"
         @"  -u, --unbuffered             don't buffer stdout\n"
         @"  -n, --nostart                do not start the app when debugging\n"
@@ -1776,6 +1794,7 @@ int main(int argc, char *argv[]) {
         { "id", required_argument, NULL, 'i' },
         { "bundle", required_argument, NULL, 'b' },
         { "args", required_argument, NULL, 'a' },
+        { "envs", required_argument, NULL, 's' },
         { "verbose", no_argument, NULL, 'v' },
         { "timeout", required_argument, NULL, 't' },
         { "unbuffered", no_argument, NULL, 'u' },
@@ -1804,7 +1823,7 @@ int main(int argc, char *argv[]) {
     };
     int ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunNrILeD:R:i:b:a:t:g:x:p:1:2:o:l::w::9::B::W", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunNrILeD:R:i:b:a:s:t:g:x:p:1:2:o:l::w::9::B::W", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -1822,6 +1841,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'a':
             args = optarg;
+            break;
+        case 's':
+            envs = optarg;
             break;
         case 'v':
             verbose = true;
