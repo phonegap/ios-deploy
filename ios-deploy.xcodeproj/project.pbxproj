@@ -291,7 +291,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"${PROJECT_DIR}/_Frameworks\"\ncp -r /System/Library/PrivateFrameworks/MobileDevice.framework \"${PROJECT_DIR}/_Frameworks\"";
+			shellScript = "mkdir -p \"${PROJECT_DIR}/_Frameworks\"\ncp -R /System/Library/PrivateFrameworks/MobileDevice.framework \"${PROJECT_DIR}/_Frameworks\"";
 		};
 		3BF32EF41F5A217100E1699B /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -330,7 +330,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"${PROJECT_DIR}/_Frameworks\"\ncp -r /System/Library/PrivateFrameworks/MobileDevice.framework \"${PROJECT_DIR}/_Frameworks\"";
+			shellScript = "mkdir -p \"${PROJECT_DIR}/_Frameworks\"\ncp -R /System/Library/PrivateFrameworks/MobileDevice.framework \"${PROJECT_DIR}/_Frameworks\"";
 		};
 		C0CD3D9B1F59DA8300F954DB /* Run Script */ = {
 			isa = PBXShellScriptBuildPhase;
