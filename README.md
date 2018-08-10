@@ -2,7 +2,7 @@
 
 ios-deploy
 ==========
-Install and debug iOS apps without using Xcode. Designed to work on un-jailbroken devices.
+Install and debug iOS apps from the command line. Designed to work on un-jailbroken devices.
 
 ## Requirements
 
