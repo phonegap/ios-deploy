@@ -1743,9 +1743,9 @@ void usage(const char* app) {
         @"  -r, --uninstall              uninstall the app before install (do not use with -m; app cache and data are cleared) \n"
         @"  -9, --uninstall_only         uninstall the app ONLY. Use only with -1 <bundle_id> \n"
         @"  -1, --bundle_id <bundle id>  specify bundle id for list and upload\n"
-        @"  -l, --list                   list files\n"
+        @"  -l, --list[=<dir>]           list all app files or the specified directory\n"
         @"  -o, --upload <file>          upload file\n"
-        @"  -w, --download               download app tree\n"
+        @"  -w, --download[=<path>]      download app tree or the specified file/directory\n"
         @"  -2, --to <target pathname>   use together with up/download file/tree. specify target\n"
         @"  -D, --mkdir <dir>            make directory on device\n"
         @"  -R, --rm <path>              remove file or directory on device (directories must be empty)\n"
@@ -1804,7 +1804,7 @@ int main(int argc, char *argv[]) {
     };
     int ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunNrILeD:R:i:b:a:t:g:x:p:1:2:o:l::w::9::B::W", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunrILeD:R:i:b:a:t:p:1:2:o:l:w:9BW", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
