@@ -86,6 +86,7 @@ If you are *not* using a node version manager like [nvm](https://github.com/crea
         -e, --exists                 check if the app with given bundle_id is installed or not 
         -B, --list_bundle_id         list bundle_id 
         -W, --no-wifi                ignore wifi devices
+        -O, --app_output <file>      redirect ios app output, only works in conjunction with --noninteractive
         --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds
 
 ## Examples

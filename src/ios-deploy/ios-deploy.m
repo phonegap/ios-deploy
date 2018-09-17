@@ -89,6 +89,7 @@ char *args = NULL;
 char *list_root = NULL;
 int _timeout = 0;
 int _detectDeadlockTimeout = 0;
+char const*app_output = "";
 int port = 0;    // 0 means "dynamically assigned"
 CFStringRef last_path = NULL;
 service_conn_t gdbfd;
@@ -634,6 +635,10 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     
     CFStringRef detect_deadlock_timeout_str = CFStringCreateWithFormat(NULL, NULL, CFSTR("%d"), _detectDeadlockTimeout);
     CFStringFindAndReplace(pmodule, CFSTR("{detect_deadlock_timeout}"), detect_deadlock_timeout_str, rangeLLDB, 0);
+    rangeLLDB.length = CFStringGetLength(pmodule);
+
+    CFStringRef app_output_str = CFStringCreateWithCString(NULL, app_output, kCFStringEncodingUTF8);
+    CFStringFindAndReplace(pmodule, CFSTR("{app_output}"), app_output_str, rangeLLDB, 0);
     rangeLLDB.length = CFStringGetLength(pmodule);
 
     if (args) {
@@ -1753,6 +1758,7 @@ void usage(const char* app) {
         @"  -e, --exists                 check if the app with given bundle_id is installed or not \n"
         @"  -B, --list_bundle_id         list bundle_id \n"
         @"  -W, --no-wifi                ignore wifi devices\n"
+        @"  -O, --app_output <file>      redirect ios app output, only works in conjunction with --noninteractive\n"
         @"  --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds\n",
         [NSString stringWithUTF8String:app]);
 }
@@ -1799,12 +1805,13 @@ int main(int argc, char *argv[]) {
         { "exists", no_argument, NULL, 'e'},
         { "list_bundle_id", no_argument, NULL, 'B'},
         { "no-wifi", no_argument, NULL, 'W'},
+        { "app_output", required_argument, NULL, 'O' },
         { "detect_deadlocks", required_argument, NULL, 1000 },
         { NULL, 0, NULL, 0 },
     };
     int ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunNrILeD:R:i:b:a:t:g:x:p:1:2:o:l::w::9::B::W", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunNrILeD:R:i:b:a:t:g:x:p:1:2:o:l::w::9::B::WO:", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -1906,6 +1913,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'W':
             no_wifi = true;
+            break;
+        case 'O':
+            app_output = optarg;
             break;
         case 1000:
             _detectDeadlockTimeout = atoi(optarg);
