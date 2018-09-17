@@ -1900,6 +1900,14 @@ void device_callback(struct am_device_notification_callback_info *info, void *ar
                 NSLogVerbose(@"Handling device type: %d", AMDeviceGetInterfaceType(info->dev));
                 handle_device(info->dev);
             }
+            break;
+        case ADNCI_MSG_DISCONNECTED:
+        {
+            CFStringRef device_uuid = AMDeviceCopyDeviceIdentifier(info->dev);
+            NSLogOut(@"[....] Disconnected %@", device_uuid);
+            CFRelease(device_uuid);
+            break;
+        }
         default:
             break;
     }
