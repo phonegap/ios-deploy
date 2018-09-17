@@ -55,14 +55,15 @@ def run_command(debugger, command, result, internal_dict):
     #This env variable makes NSLog, CFLog and os_log messages get mirrored to stderr
     #https://stackoverflow.com/a/39581193 
     launchInfo.SetEnvironmentEntries(['OS_ACTIVITY_DT_MODE=enable'], True)
-    
+
     lldb.target.Launch(launchInfo, error)
-    lockedstr = ': Locked'
-    if lockedstr in str(error):
-       print('\\nDevice Locked\\n')
-       os._exit(254)
-    else:
-       print(str(error))
+    if error.Fail():
+        if ': Locked' in str(error):
+            print('\\nDevice Locked\\n')
+        else:
+            print(str(error))
+        #force exit to make sure autoexit or safequit don't end up waiting forever
+        os._exit({exitcode_error})
 
 def safequit_command(debugger, command, result, internal_dict):
     process = lldb.target.process
