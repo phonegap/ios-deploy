@@ -130,21 +130,30 @@ def autoexit_command(debugger, command, result, internal_dict):
         if state == lldb.eStateExited:
             sys.stdout.write( '\\nPROCESS_EXITED\\n' )
             Exit(process.GetExitStatus())
-        elif printBacktraceTime is None and state == lldb.eStateStopped:
-            sys.stdout.write( '\\nPROCESS_STOPPED\\n' )
-            debugger.HandleCommand('bt')
+        elif state == lldb.eStateRunning:
+            if printBacktraceTime is not None and time.time() >= printBacktraceTime:
+                printBacktraceTime = None
+                sys.stdout.write( '\\nPRINT_BACKTRACE_TIMEOUT\\n' )
+                debugger.HandleCommand('process interrupt')
+                debugger.HandleCommand('bt all')
+                debugger.HandleCommand('continue')
+                printBacktraceTime = time.time() + 5
+        elif state == lldb.eStateStepping or state == lldb.eStateConnected:
+            continue
+        elif state == lldb.eStateExited:
+            sys.stdout.write( '\\nPROCESS_EXITED\\n' )
+            Exit(process.GetExitStatus())
+        else:
+            if state == lldb.eStateStopped:
+                sys.stdout.write( '\\nPROCESS_STOPPED\\n' )
+                debugger.HandleCommand('bt')
+            elif state == lldb.eStateCrashed:
+                sys.stdout.write( '\\nPROCESS_CRASHED\\n' )
+                debugger.HandleCommand('bt')
+            elif state == lldb.eStateDetached:
+                sys.stdout.write( '\\nPROCESS_DETACHED\\n' )
+            else:
+                sys.stdout.write( '\\nPROCESS_\\n' + str(state).upper() )
+                debugger.HandleCommand('bt')
             Exit({exitcode_app_crash})
-        elif state == lldb.eStateCrashed:
-            sys.stdout.write( '\\nPROCESS_CRASHED\\n' )
-            debugger.HandleCommand('bt')
-            Exit({exitcode_app_crash})
-        elif state == lldb.eStateDetached:
-            sys.stdout.write( '\\nPROCESS_DETACHED\\n' )
-            Exit({exitcode_app_crash})
-        elif printBacktraceTime is not None and time.time() >= printBacktraceTime:
-            printBacktraceTime = None
-            sys.stdout.write( '\\nPRINT_BACKTRACE_TIMEOUT\\n' )
-            debugger.HandleCommand('process interrupt')
-            debugger.HandleCommand('bt all')
-            debugger.HandleCommand('continue')
-            printBacktraceTime = time.time() + 5
+
