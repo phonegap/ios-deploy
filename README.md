@@ -2,6 +2,7 @@
 
 ios-deploy
 ==========
+
 Install and debug iOS apps from the command line. Designed to work on un-jailbroken devices.
 
 ## Requirements
@@ -19,9 +20,8 @@ See our [milestones](https://github.com/phonegap/ios-deploy/milestones).
 The 1.x branch has been archived (renamed for now), all development is to be on the master branch for simplicity, since the planned 2.x development (break out commands into their own files) has been abandoned for now.
 
 ## Installation
-=======
 
-ios-deploy installation is made simple using the node.js package manager.  If you use [Homebrew](http://brew.sh/), install [node.js](https://nodejs.org):
+ios-deploy installation is made simple using the node.js package manager.  If you use [Homebrew](https://brew.sh/), install [node.js](https://nodejs.org):
 
 ```
 brew install node
@@ -139,4 +139,5 @@ The included demo.app represents the minimum required to get code running on iOS
 * `make debug` will install demo.app and launch a LLDB session.
 
 ## Notes
+
 * `--detect_deadlocks` can help to identify an exact state of application's threads in case of a deadlock. It works like this: The user specifies the amount of time ios-deploy runs the app as usual. When the timeout is elapsed ios-deploy starts to print call-stacks of all threads every 5 seconds and the app keeps running. Comparing threads' call-stacks between each other helps to identify the threads which were stuck.
