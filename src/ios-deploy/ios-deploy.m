@@ -20,7 +20,7 @@
 #import "device_db.h"
 
 #define PREP_CMDS_PATH @"/tmp/%@/fruitstrap-lldb-prep-cmds-"
-#define LLDB_SHELL @"lldb -s %@"
+#define LLDB_SHELL @"PATH=/usr/bin /usr/bin/lldb -s %@"
 /*
  * Startup script passed to lldb.
  * To see how xcode interacts with lldb, put this into .lldbinit:
