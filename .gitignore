@@ -6,3 +6,6 @@ _Frameworks/*
 src/scripts/lldb.pyc
 src/ios-deploy/lldb.py.h
 src/ios-deploy/lldb_cmds.h
+package-lock.json
+xcuserdata
+/ios-deploy.xcodeproj/project.xcworkspace

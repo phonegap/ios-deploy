@@ -67,7 +67,7 @@ int AMDeviceMountImage(AMDeviceRef device, CFStringRef image, CFDictionaryRef op
 mach_error_t AMDeviceLookupApplications(AMDeviceRef device, CFDictionaryRef options, CFDictionaryRef *result);
 int AMDeviceGetInterfaceType(struct am_device *device);
 
-bool found_device = false, debug = false, verbose = false, unbuffered = false, nostart = false, detect_only = false, install = true, uninstall = false, no_wifi = false;
+bool found_device = false, debug = false, verbose = false, unbuffered = false, nostart = false, debugserver_only = false, detect_only = false, install = true, uninstall = false, no_wifi = false;
 bool command_only = false;
 char *command = NULL;
 char const*target_filename = NULL;
@@ -696,8 +696,8 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
 
     NSString* python_command = @"fruitstrap_";
     if(device_id != NULL) {
-        python_file_path = [python_file_path stringByAppendingString:[NSString stringWithUTF8String:device_id]];
-        python_command = [python_command stringByAppendingString:[NSString stringWithUTF8String:device_id]];
+        python_file_path = [python_file_path stringByAppendingString:[[NSString stringWithUTF8String:device_id] stringByReplacingOccurrencesOfString:@"-" withString:@"_"]];
+        python_command = [python_command stringByAppendingString:[[NSString stringWithUTF8String:device_id] stringByReplacingOccurrencesOfString:@"-" withString:@"_"]];
     }
     python_file_path = [python_file_path stringByAppendingString:@".py"];
 
@@ -726,7 +726,7 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     CFDataRef cmds_data = CFStringCreateExternalRepresentation(NULL, cmds, kCFStringEncodingUTF8, 0);
     NSString* prep_cmds_path = [NSString stringWithFormat:PREP_CMDS_PATH, tmpUUID];
     if(device_id != NULL) {
-        prep_cmds_path = [prep_cmds_path stringByAppendingString:[NSString stringWithUTF8String:device_id]];
+        prep_cmds_path = [prep_cmds_path stringByAppendingString:[[NSString stringWithUTF8String:device_id] stringByReplacingOccurrencesOfString:@"-" withString:@"_"]];
     }
     FILE *out = fopen([prep_cmds_path UTF8String], "w");
     fwrite(CFDataGetBytePtr(cmds_data), CFDataGetLength(cmds_data), 1, out);
@@ -930,7 +930,8 @@ void setup_lldb(AMDeviceRef device, CFURLRef url) {
 
     mount_developer_image(device);      // put debugserver on the device
     start_remote_debug_server(device);  // start debugserver
-    write_lldb_prep_cmds(device, url);   // dump the necessary lldb commands into a file
+    if (!debugserver_only)
+        write_lldb_prep_cmds(device, url);   // dump the necessary lldb commands into a file
 
     CFRelease(url);
 
@@ -971,7 +972,7 @@ void launch_debugger(AMDeviceRef device, CFURLRef url) {
         lldb_shell = [NSString stringWithFormat:LLDB_SHELL, prep_cmds];
 
         if(device_id != NULL) {
-            lldb_shell = [lldb_shell stringByAppendingString: [NSString stringWithUTF8String:device_id]];
+            lldb_shell = [lldb_shell stringByAppendingString: [[NSString stringWithUTF8String:device_id] stringByReplacingOccurrencesOfString:@"-" withString:@"_"]];
         }
 
         int status = system([lldb_shell UTF8String]); // launch lldb
@@ -1010,7 +1011,7 @@ void launch_debugger_and_exit(AMDeviceRef device, CFURLRef url) {
         NSString* prep_cmds = [NSString stringWithFormat:PREP_CMDS_PATH, tmpUUID];
         NSString* lldb_shell = [NSString stringWithFormat:LLDB_SHELL, prep_cmds];
         if(device_id != NULL) {
-            lldb_shell = [lldb_shell stringByAppendingString:[NSString stringWithUTF8String:device_id]];
+            lldb_shell = [lldb_shell stringByAppendingString:[[NSString stringWithUTF8String:device_id] stringByReplacingOccurrencesOfString:@"-" withString:@"_"]];
         }
 
         int status = system([lldb_shell UTF8String]); // launch lldb
@@ -1029,6 +1030,20 @@ void launch_debugger_and_exit(AMDeviceRef device, CFURLRef url) {
     } else {
         on_sys_error(@"Fork failed");
     }
+}
+
+void launch_debugserver_only(AMDeviceRef device, CFURLRef url)
+{
+    CFRetain(url);
+    setup_lldb(device,url);
+
+    CFStringRef bundle_identifier = copy_disk_app_identifier(url);
+    CFURLRef device_app_url = copy_device_app_url(device, bundle_identifier);
+    CFStringRef device_app_path = CFURLCopyFileSystemPath(device_app_url, kCFURLPOSIXPathStyle);
+    CFRelease(url);
+
+    NSLogOut(@"debugserver port: %d", port);
+    NSLogOut(@"App path: %@", device_app_path);
 }
 
 CFStringRef get_bundle_id(CFURLRef app_url)
@@ -1640,10 +1655,13 @@ void handle_device(AMDeviceRef device) {
     if (!debug)
         exit(0); // no debug phase
 
-    if (justlaunch)
+    if (justlaunch) {
         launch_debugger_and_exit(device, url);
-    else
+    } else if (debugserver_only) {
+        launch_debugserver_only(device, url);
+    } else {
         launch_debugger(device, url);
+    }
 }
 
 void device_callback(struct am_device_notification_callback_info *info, void *arg) {
@@ -1725,6 +1743,7 @@ void usage(const char* app) {
         @"  -t, --timeout <timeout>      number of seconds to wait for a device to be connected\n"
         @"  -u, --unbuffered             don't buffer stdout\n"
         @"  -n, --nostart                do not start the app when debugging\n"
+        @"  -N, --nolldb                 start debugserver only. do not run lldb\n"
         @"  -I, --noninteractive         start in non interactive mode (quit when app crashes or exits)\n"
         @"  -L, --justlaunch             just launch the app and exit lldb\n"
         @"  -v, --verbose                enable verbose output\n"
@@ -1772,6 +1791,7 @@ int main(int argc, char *argv[]) {
         { "timeout", required_argument, NULL, 't' },
         { "unbuffered", no_argument, NULL, 'u' },
         { "nostart", no_argument, NULL, 'n' },
+        { "nolldb", no_argument, NULL, 'N' },
         { "noninteractive", no_argument, NULL, 'I' },
         { "justlaunch", no_argument, NULL, 'L' },
         { "detect", no_argument, NULL, 'c' },
@@ -1797,15 +1817,15 @@ int main(int argc, char *argv[]) {
     };
     int ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunrILeD:R:i:b:a:t:g:x:p:1:2:o:l::w::9::B::W", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunNrILeD:R:i:b:a:t:g:x:p:1:2:o:l::w::9::B::W", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
-            install = 0;
-            debug = 1;
+            install = false;
+            debug = true;
             break;
         case 'd':
-            debug = 1;
+            debug = true;
             break;
         case 'i':
             device_id = optarg;
@@ -1817,29 +1837,33 @@ int main(int argc, char *argv[]) {
             args = optarg;
             break;
         case 'v':
-            verbose = 1;
+            verbose = true;
             break;
         case 't':
             _timeout = atoi(optarg);
             break;
         case 'u':
-            unbuffered = 1;
+            unbuffered = true;
             break;
         case 'n':
-            nostart = 1;
+            nostart = true;
+            break;
+        case 'N':
+            debugserver_only = true;
+            debug = true;
             break;
         case 'I':
             interactive = false;
-            debug = 1;
+            debug = true;
             break;
         case 'L':
             interactive = false;
             justlaunch = true;
-            debug = 1;
+            debug = true;
             break;
         case 'c':
             detect_only = true;
-            debug = 1;
+            debug = true;
             break;
         case 'V':
             show_version();
@@ -1848,7 +1872,7 @@ int main(int argc, char *argv[]) {
             port = atoi(optarg);
             break;
         case 'r':
-            uninstall = 1;
+            uninstall = true;
             break;
         case '9':
             command_only = true;
