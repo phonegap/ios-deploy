@@ -1,25 +1,30 @@
 {
   "name": "ios-deploy",
-  "version": "2.0.0",
+  "version": "1.9.4",
   "os": [
     "darwin"
   ],
   "description": "launch iOS apps iOS devices from the command line (Xcode 7)",
   "main": "ios-deploy",
-  "scripts": {
-  },
   "bin": "./build/Release/ios-deploy",
   "repository": {
     "type": "git",
-    "url": "https://github.com/phonegap/ios-deploy"
+    "url": "https://github.com/ios-control/ios-deploy"
   },
   "devDependencies": {
-  	"jshint": "2.5.8"
+    "eslint": "~4.19.1",
+    "eslint-config-semistandard": "^12.0.1",
+    "eslint-config-standard": "^11.0.0",
+    "eslint-plugin-import": "^2.12.0",
+    "eslint-plugin-node": "^6.0.1",
+    "eslint-plugin-promise": "^3.8.0",
+    "eslint-plugin-standard": "^3.1.0"
   },
   "scripts": {
     "preinstall": "./src/scripts/check_reqs.js && xcodebuild",
-    "test": "npm run pycompile && npm run jshint && xcodebuild -target ios-deploy-lib && xcodebuild test -scheme ios-deploy-tests",
-    "jshint": "node node_modules/jshint/bin/jshint src/scripts/*.js",
+    "build-test": "npm run pycompile && xcodebuild -target ios-deploy-lib && xcodebuild test -scheme ios-deploy-tests",
+    "eslint": "eslint src/scripts/*.js",
+    "test": "npm run eslint && npm run build-test",
     "pycompile": "python -m py_compile src/scripts/*.py"
   },
   "keywords": [
@@ -27,8 +32,8 @@
     "deploy to iOS device"
   ],
   "bugs": {
-      "url": "https://github.com/phonegap/ios-deploy/issues"
-   },
+    "url": "https://github.com/phonegap/ios-deploy/issues"
+  },
   "author": "Greg Hughes",
   "license": "GPLv3"
 }

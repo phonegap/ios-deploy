@@ -2,7 +2,7 @@
 
 ios-deploy
 ==========
-Install and debug iOS apps without using Xcode. Designed to work on un-jailbroken devices.
+Install and debug iOS apps from the command line. Designed to work on un-jailbroken devices.
 
 ## Requirements
 
@@ -13,16 +13,10 @@ Install and debug iOS apps without using Xcode. Designed to work on un-jailbroke
 ## Roadmap
 
 See our [milestones](https://github.com/phonegap/ios-deploy/milestones).
-
-Significant changes: 
-
-    1.8.0 will use an Xcode project instead of a Makefile (to prepare for 2.0.0) (1.x branch)
-    2.0.0 will break out the commands into their own files, and create ios-deploy-lib for node.js use (master branch)
 	
 ## Development
 
-The legacy `1.x` version is under the `1.x` branch. Bug fixes for the `1.x` series will occur under there.
-The 'master' branch now contains the `2.x` series, and is the development branch. 	
+The 1.x branch has been archived (renamed for now), all development is to be on the master branch for simplicity, since the planned 2.x development (break out commands into their own files) has been abandoned for now.
 
 ## Installation
 =======

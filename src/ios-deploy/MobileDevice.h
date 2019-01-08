@@ -289,7 +289,7 @@ afc_error_t AFCDeviceInfoOpen(afc_connection *conn, struct
 
 /* Turns debug mode on if the environment variable AFCDEBUG is set to a numeric
  * value, or if the file '/AFCDEBUG' is present and contains a value. */
-void AFCPlatformInit();
+    void AFCPlatformInit(void);
 
 /* Opens a directory on the iPhone. Pass in a pointer in dir to be filled in.
  * Note that this normally only accesses the iTunes sandbox/partition as the
