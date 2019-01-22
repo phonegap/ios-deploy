@@ -1267,6 +1267,22 @@ int app_exists(AMDeviceRef device)
     return -1;
 }
 
+void get_battery_level(AMDeviceRef device)
+{
+    
+    AMDeviceConnect(device);
+    assert(AMDeviceIsPaired(device));
+    check_error(AMDeviceValidatePairing(device));
+    check_error(AMDeviceStartSession(device));
+
+    CFStringRef result = AMDeviceCopyValue(device, @"com.apple.mobile.battery", @"BatteryCurrentCapacity");
+    NSLogOut(@"%@",result);
+    CFRelease(result);
+    
+    check_error(AMDeviceStopSession(device));
+    check_error(AMDeviceDisconnect(device));
+}
+
 void list_bundle_id(AMDeviceRef device)
 {
     AMDeviceConnect(device);
@@ -1564,6 +1580,8 @@ void handle_device(AMDeviceRef device) {
         } else if (strcmp("list_bundle_id", command) == 0) {
             list_bundle_id(device);
         }
+        } else if (strcmp("get_battery_level", command) == 0) {
+            get_battery_level(device);
         exit(0);
     }
 
@@ -1771,6 +1789,7 @@ void usage(const char* app) {
         @"  -e, --exists                 check if the app with given bundle_id is installed or not \n"
         @"  -B, --list_bundle_id         list bundle_id \n"
         @"  -W, --no-wifi                ignore wifi devices\n"
+        @"  -C, --get_battery_level      get battery current capacity \n"
         @"  --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds\n",
         [NSString stringWithUTF8String:app]);
 }
@@ -1818,12 +1837,13 @@ int main(int argc, char *argv[]) {
         { "exists", no_argument, NULL, 'e'},
         { "list_bundle_id", no_argument, NULL, 'B'},
         { "no-wifi", no_argument, NULL, 'W'},
+        { "get_battery_level", no_argument, NULL, 'C'},
         { "detect_deadlocks", required_argument, NULL, 1000 },
         { NULL, 0, NULL, 0 },
     };
     int ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunNrILeD:R:i:b:a:s:t:g:x:p:1:2:o:l::w::9::B::W", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunNrILeD:R:i:b:a:s:t:g:x:p:1:2:o:l::w::9::B::W::C", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -1928,6 +1948,10 @@ int main(int argc, char *argv[]) {
             break;
         case 'W':
             no_wifi = true;
+            break;
+        case 'C':
+            command_only = true;
+            command = "get_battery_level";
             break;
         case 1000:
             _detectDeadlockTimeout = atoi(optarg);
