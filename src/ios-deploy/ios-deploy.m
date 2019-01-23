@@ -1579,9 +1579,9 @@ void handle_device(AMDeviceRef device) {
             uninstall_app(device);
         } else if (strcmp("list_bundle_id", command) == 0) {
             list_bundle_id(device);
-        }
         } else if (strcmp("get_battery_level", command) == 0) {
             get_battery_level(device);
+        }
         exit(0);
     }
 
