@@ -66,6 +66,7 @@ If you are *not* using a node version manager like [nvm](https://github.com/crea
         -b, --bundle <bundle.app>    the path to the app bundle to be installed
         -a, --args <args>            command line arguments to pass to the app when launching it
         -s, --envs <envs>            environment variables, space separated key-value pairs, to pass to the app when launching it
+        -S, --stopapp                stop the app
         -t, --timeout <timeout>      number of seconds to wait for a device to be connected
         -u, --unbuffered             don't buffer stdout
         -n, --nostart                do not start the app when debugging
