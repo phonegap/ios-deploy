@@ -90,6 +90,7 @@ char *envs = NULL;
 char *list_root = NULL;
 int _timeout = 0;
 int _detectDeadlockTimeout = 0;
+bool _json_output = false;
 int port = 0;    // 0 means "dynamically assigned"
 CFStringRef last_path = NULL;
 service_conn_t gdbfd;
@@ -150,18 +151,35 @@ void __NSLogOut(NSString* format, va_list valist) {
 }
 
 void NSLogOut(NSString* format, ...) {
-    va_list valist;
-    va_start(valist, format);
-    __NSLogOut(format, valist);
-    va_end(valist);
-}
-
-void NSLogVerbose(NSString* format, ...) {
-    if (verbose) {
+    if (!_json_output) {
         va_list valist;
         va_start(valist, format);
         __NSLogOut(format, valist);
         va_end(valist);
+    }
+}
+
+void NSLogVerbose(NSString* format, ...) {
+    if (verbose && !_json_output) {
+        va_list valist;
+        va_start(valist, format);
+        __NSLogOut(format, valist);
+        va_end(valist);
+    }
+}
+
+void NSLogJSON(NSDictionary* jsonDict) {
+    if (_json_output) {
+        NSError *error;
+        NSData *data = [NSJSONSerialization dataWithJSONObject:jsonDict
+                                                           options:NSJSONWritingPrettyPrinted
+                                                             error:&error];
+        assert(data != NULL);
+        NSString *jsonString = @"{\"error\": \"JSON error\"}";
+        if (data) {
+            jsonString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+        }
+        [jsonString writeToFile:@"/dev/stdout" atomically:NO encoding:NSUTF8StringEncoding error:nil];
     }
 }
 
@@ -378,6 +396,49 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
         CFRelease(model_name);
 
     return full_name;
+}
+
+NSDictionary* get_device_json_dict(const AMDeviceRef device) {
+    NSMutableDictionary *json_dict = [NSMutableDictionary new];
+    AMDeviceConnect(device);
+    
+    CFStringRef device_udid = AMDeviceCopyDeviceIdentifier(device);
+    if (device_udid) {
+        [json_dict setValue:(__bridge NSString *)device_udid forKey:@"DeviceIdentifier"];
+        CFRelease(device_udid);
+    }
+    
+    CFStringRef device_hardware_model = AMDeviceCopyDeviceIdentifier(device);
+    if (device_hardware_model) {
+        [json_dict setValue:(NSString*)device_hardware_model forKey:@"HardwareModel"];
+        size_t device_db_length = sizeof(device_db) / sizeof(device_desc);
+        for (size_t i = 0; i < device_db_length; i ++) {
+            if (CFStringCompare(device_hardware_model, device_db[i].model, kCFCompareNonliteral | kCFCompareCaseInsensitive) == kCFCompareEqualTo) {
+                device_desc dev = device_db[i];
+                [json_dict setValue:(__bridge NSString *)dev.name forKey:@"modelName"];
+                [json_dict setValue:(__bridge NSString *)dev.sdk forKey:@"modelSDK"];
+                [json_dict setValue:(__bridge NSString *)dev.arch forKey:@"modelArch"];
+                break;
+            }
+        }
+        CFRelease(device_hardware_model);
+    }
+    
+    for (NSString *deviceValue in @[@"DeviceName",
+                                    @"BuildVersion",
+                                    @"DeviceClass",
+                                    @"ProductType",
+                                    @"ProductVersion"]) {
+        CFStringRef cf_value = AMDeviceCopyValue(device, 0, (__bridge CFStringRef)deviceValue);
+        if (cf_value) {
+            [json_dict setValue:(__bridge NSString *)cf_value forKey:deviceValue];
+            CFRelease(cf_value);
+        }
+    }
+    
+    AMDeviceDisconnect(device);
+
+    return json_dict;
 }
 
 CFStringRef get_device_interface_name(const AMDeviceRef device) {
@@ -1526,7 +1587,13 @@ void handle_device(AMDeviceRef device) {
                 device_interface_name = get_device_interface_name(device);
 
     if (detect_only) {
-        NSLogOut(@"[....] Found %@ connected through %@.", device_full_name, device_interface_name);
+        if (_json_output) {
+            NSLogJSON(@{@"Event": @"DeviceDetected",
+                        @"Device": get_device_json_dict(device)
+                        });
+        } else {
+            NSLogOut(@"[....] Found %@ connected through %@.", device_full_name, device_interface_name);
+        }
         found_device = true;
         return;
     }
@@ -1771,7 +1838,8 @@ void usage(const char* app) {
         @"  -e, --exists                 check if the app with given bundle_id is installed or not \n"
         @"  -B, --list_bundle_id         list bundle_id \n"
         @"  -W, --no-wifi                ignore wifi devices\n"
-        @"  --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds\n",
+        @"  --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds\n"
+        @"  -j, --json                   format output as JSON\n",
         [NSString stringWithUTF8String:app]);
 }
 
@@ -1819,6 +1887,7 @@ int main(int argc, char *argv[]) {
         { "list_bundle_id", no_argument, NULL, 'B'},
         { "no-wifi", no_argument, NULL, 'W'},
         { "detect_deadlocks", required_argument, NULL, 1000 },
+        { "json", no_argument, NULL, 'j'},
         { NULL, 0, NULL, 0 },
     };
     int ch;
@@ -1931,6 +2000,9 @@ int main(int argc, char *argv[]) {
             break;
         case 1000:
             _detectDeadlockTimeout = atoi(optarg);
+            break;
+        case 'j':
+            _json_output = true;
             break;
         default:
             usage(argv[0]);
