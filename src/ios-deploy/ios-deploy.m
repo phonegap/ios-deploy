@@ -314,23 +314,6 @@ device_desc get_device_desc(CFStringRef model) {
     return res;
 }
 
-char * MYCFStringCopyUTF8String(CFStringRef aString) {
-  if (aString == NULL) {
-    return NULL;
-  }
-
-  CFIndex length = CFStringGetLength(aString);
-  CFIndex maxSize =
-  CFStringGetMaximumSizeForEncoding(length,
-                                    kCFStringEncodingUTF8);
-  char *buffer = (char *)malloc(maxSize);
-  if (CFStringGetCString(aString, buffer, maxSize,
-                         kCFStringEncodingUTF8)) {
-    return buffer;
-  }
-  return NULL;
-}
-
 CFStringRef get_device_full_name(const AMDeviceRef device) {
     CFStringRef full_name = NULL,
                 device_udid = AMDeviceCopyDeviceIdentifier(device),
@@ -1540,7 +1523,8 @@ void handle_device(AMDeviceRef device) {
             return;
         }
     } else {
-        device_id = MYCFStringCopyUTF8String(found_device_id);
+        // Use the first device we find if a device_id wasn't specified.
+        device_id = strdup(CFStringGetCStringPtr(found_device_id, kCFStringEncodingUTF8));
         found_device = true;
     }
 
