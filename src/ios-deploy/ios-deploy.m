@@ -408,7 +408,7 @@ NSDictionary* get_device_json_dict(const AMDeviceRef device) {
         CFRelease(device_udid);
     }
     
-    CFStringRef device_hardware_model = AMDeviceCopyDeviceIdentifier(device);
+    CFStringRef device_hardware_model = AMDeviceCopyValue(device, 0, CFSTR("HardwareModel"));
     if (device_hardware_model) {
         [json_dict setValue:(NSString*)device_hardware_model forKey:@"HardwareModel"];
         size_t device_db_length = sizeof(device_db) / sizeof(device_desc);
