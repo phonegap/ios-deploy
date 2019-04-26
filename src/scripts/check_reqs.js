@@ -24,9 +24,6 @@ xcode_version.on('error', function (err) {
 
 xcode_version.on('close', function (code) {
 	if (code === 0) {
-		var arr = version_string.match(/^Xcode (\d+\.\d+)/);
-		var ver = arr[1];
-
 		if (parseInt(os.release().split('.')[0]) >= 15) { // print the El Capitan warning
 			console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
 			console.log('!!!! WARNING: You are on OS X 10.11 El Capitan or greater, you may need to add the');
