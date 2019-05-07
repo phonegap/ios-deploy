@@ -1892,7 +1892,7 @@ int main(int argc, char *argv[]) {
     };
     int ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunNrILeD:R:i:b:a:s:t:g:x:p:1:2:o:l::w::9::B::W", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunNrILeD:R:i:b:a:s:t:g:x:p:1:2:o:l::w::9::B::W::j", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
