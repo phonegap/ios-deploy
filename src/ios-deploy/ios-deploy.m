@@ -1675,7 +1675,7 @@ void handle_device(AMDeviceRef device) {
 void device_callback(struct am_device_notification_callback_info *info, void *arg) {
     switch (info->msg) {
         case ADNCI_MSG_CONNECTED:
-            if(device_id != NULL || !debug || AMDeviceGetInterfaceType(info->dev) != 2) {
+            if(device_id != NULL || !debug || AMDeviceGetInterfaceType(info->dev) != 2 || detect_only) {
                 if (no_wifi && AMDeviceGetInterfaceType(info->dev) == 2)
                 {
                     NSLogVerbose(@"Skipping wifi device (type: %d)", AMDeviceGetInterfaceType(info->dev));
