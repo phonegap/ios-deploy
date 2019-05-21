@@ -50,18 +50,16 @@ const char* lldb_prep_interactive_cmds = "\
 const char* lldb_prep_noninteractive_justlaunch_cmds = "\
     run\n\
     safequit\n\
-    kill\n\
 ";
 
 const char* lldb_prep_stopapp_cmds = "\
-kill\n\
-autoexit\n\
+    kill\n\
+    autoexit\n\
 ";
 
 const char* lldb_prep_noninteractive_cmds = "\
     run\n\
     autoexit\n\
-    kill\n\
 ";
 
 /*
@@ -738,7 +736,7 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     if (!interactive)
     {
         if (stopapp)
-        extra_cmds = lldb_prep_stopapp_cmds;
+          extra_cmds = lldb_prep_stopapp_cmds;
         else if (justlaunch)
           extra_cmds = lldb_prep_noninteractive_justlaunch_cmds;
         else
@@ -1834,7 +1832,7 @@ int main(int argc, char *argv[]) {
     };
     int ch;
 
-     while ((ch = getopt_long(argc, argv, "VSmcdvunrILeD:R:i:b:a:t:g:x:p:1:2:o:l::w::9::B::W", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VSmcdvunrILeD:R:i:b:a:s:t:g:x:p:1:2:o:l::w::9::B::W", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -1861,6 +1859,7 @@ int main(int argc, char *argv[]) {
             justlaunch = true;
             install = false;
             debug = false;
+            break;
         case 'v':
             verbose = true;
             break;
