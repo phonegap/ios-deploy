@@ -31,6 +31,7 @@ device_desc device_db[] = {
                           ADD_DEVICE("N78AP",  "iPod Touch 5G",              "iphoneos", "armv7"),
                           ADD_DEVICE("N78AAP", "iPod Touch 5G",              "iphoneos", "armv7"),
                           ADD_DEVICE("N102AP", "iPod Touch 6G",              "iphoneos", "arm64"),
+                          ADD_DEVICE("N112AP", "iPod Touch 7G",              "iphoneos", "arm64"),
 
                           // iPad
 
