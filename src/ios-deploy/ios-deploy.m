@@ -52,9 +52,10 @@ const char* lldb_prep_noninteractive_justlaunch_cmds = "\
     safequit\n\
 ";
 
-const char* lldb_prep_stopapp_cmds = "\
+const char* lldb_prep_noninteractive_stopapp_cmds = "\
+    run\n\
     kill\n\
-    autoexit\n\
+    safequit\n\
 ";
 
 const char* lldb_prep_noninteractive_cmds = "\
@@ -736,7 +737,7 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     if (!interactive)
     {
         if (stopapp)
-          extra_cmds = lldb_prep_stopapp_cmds;
+          extra_cmds = lldb_prep_noninteractive_stopapp_cmds;
         else if (justlaunch)
           extra_cmds = lldb_prep_noninteractive_justlaunch_cmds;
         else
@@ -1856,9 +1857,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'S':
             stopapp = true;
-            justlaunch = true;
-            install = false;
-            debug = false;
+            justlaunch = false;
+            interactive = false;
+            debug = true;
             break;
         case 'v':
             verbose = true;
