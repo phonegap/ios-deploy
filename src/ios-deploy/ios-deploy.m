@@ -1722,8 +1722,7 @@ void timeout_callback(CFRunLoopTimerRef timer, void *info) {
         exit(exitcode_timeout);
         return;
     } else if ((!found_device) && (!detect_only))  {
-        if (!found_device)
-            on_error(@"Timed out waiting for device.");
+        on_error(@"Timed out waiting for device.");
     }
     else
     {
