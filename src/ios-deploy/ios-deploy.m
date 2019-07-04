@@ -101,7 +101,6 @@ pid_t parent = 0;
 pid_t child = 0;
 // Signal sent from child to parent process when LLDB finishes.
 const int SIGLLDB = SIGUSR1;
-AMDeviceRef best_device_match = NULL;
 NSString* tmpUUID;
 struct am_device_notification *notify;
 
@@ -1698,20 +1697,14 @@ void handle_device(AMDeviceRef device) {
 void device_callback(struct am_device_notification_callback_info *info, void *arg) {
     switch (info->msg) {
         case ADNCI_MSG_CONNECTED:
-            if(device_id != NULL || !debug || detect_only) {
-                if (no_wifi && AMDeviceGetInterfaceType(info->dev) == 2)
-                {
-                    NSLogVerbose(@"Skipping wifi device (type: %d)", AMDeviceGetInterfaceType(info->dev));
-                }
-                else
-                {
-                    NSLogVerbose(@"Handling device type: %d", AMDeviceGetInterfaceType(info->dev));
-                    handle_device(info->dev);
-                }
-            } else if(best_device_match == NULL) {
-                NSLogVerbose(@"Best device match: %d", AMDeviceGetInterfaceType(info->dev));
-                best_device_match = info->dev;
-                CFRetain(best_device_match);
+            if (no_wifi && AMDeviceGetInterfaceType(info->dev) == 2)
+            {
+                NSLogVerbose(@"Skipping wifi device (type: %d)", AMDeviceGetInterfaceType(info->dev));
+            }
+            else
+            {
+                NSLogVerbose(@"Handling device type: %d", AMDeviceGetInterfaceType(info->dev));
+                handle_device(info->dev);
             }
         default:
             break;
@@ -1729,15 +1722,6 @@ void timeout_callback(CFRunLoopTimerRef timer, void *info) {
         exit(exitcode_timeout);
         return;
     } else if ((!found_device) && (!detect_only))  {
-        // Device not found timeout
-        if (best_device_match != NULL) {
-            NSLogVerbose(@"Handling best device match.");
-            handle_device(best_device_match);
-
-            CFRelease(best_device_match);
-            best_device_match = NULL;
-        }
-
         if (!found_device)
             on_error(@"Timed out waiting for device.");
     }
