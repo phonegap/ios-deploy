@@ -25,7 +25,8 @@
     "build-test": "npm run pycompile && xcodebuild -target ios-deploy-lib && xcodebuild test -scheme ios-deploy-tests",
     "eslint": "eslint src/scripts/*.js",
     "test": "npm run eslint && npm run build-test",
-    "pycompile": "python -m py_compile src/scripts/*.py"
+    "pycompile": "python -m py_compile src/scripts/*.py",
+    "postversion": "echo \\\"$npm_package_version\\\" > src/ios-deploy/version.h"
   },
   "keywords": [
     "ios-deploy",
