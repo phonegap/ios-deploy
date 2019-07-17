@@ -1,14 +1,15 @@
-[![Build Status](https://travis-ci.org/phonegap/ios-deploy.svg?branch=master)](https://travis-ci.org/phonegap/ios-deploy)
+[![Build Status](https://travis-ci.org/ios-control/ios-deploy.svg?branch=master)](https://travis-ci.org/ios-control/ios-deploy)
 
 ios-deploy
 ==========
+
 Install and debug iOS apps from the command line. Designed to work on un-jailbroken devices.
 
 ## Requirements
 
 * Mac OS X. Tested on 10.11 El Capitan, 10.12 Sierra, iOS 9.0 and iOS 10.0
 * You need to have a valid iOS Development certificate installed.
-* Xcode 7 or greater should be installed (**NOT** Command Line Tools!)
+* Xcode 7 or greater should be installed (**NOT** just Command Line Tools!)
 
 ## Roadmap
 
@@ -19,9 +20,8 @@ See our [milestones](https://github.com/phonegap/ios-deploy/milestones).
 The 1.x branch has been archived (renamed for now), all development is to be on the master branch for simplicity, since the planned 2.x development (break out commands into their own files) has been abandoned for now.
 
 ## Installation
-=======
 
-ios-deploy installation is made simple using the node.js package manager.  If you use [Homebrew](http://brew.sh/), install [node.js](https://nodejs.org):
+ios-deploy installation is made simple using the node.js package manager.  If you use [Homebrew](https://brew.sh/), install [node.js](https://nodejs.org):
 
 ```
 brew install node
@@ -65,6 +65,7 @@ If you are *not* using a node version manager like [nvm](https://github.com/crea
         -c, --detect                 only detect if the device is connected
         -b, --bundle <bundle.app>    the path to the app bundle to be installed
         -a, --args <args>            command line arguments to pass to the app when launching it
+        -s, --envs <envs>            environment variables, space separated key-value pairs, to pass to the app when launching it
         -t, --timeout <timeout>      number of seconds to wait for a device to be connected
         -u, --unbuffered             don't buffer stdout
         -n, --nostart                do not start the app when debugging
@@ -76,9 +77,9 @@ If you are *not* using a node version manager like [nvm](https://github.com/crea
         -r, --uninstall              uninstall the app before install (do not use with -m; app cache and data are cleared) 
         -9, --uninstall_only         uninstall the app ONLY. Use only with -1 <bundle_id> 
         -1, --bundle_id <bundle id>  specify bundle id for list and upload
-        -l, --list                   list files
+        -l, --list[=<dir>]           list all app files or the specified directory
         -o, --upload <file>          upload file
-        -w, --download               download app tree
+        -w, --download[=<path>]      download app tree or the specified file/directory
         -2, --to <target pathname>   use together with up/download file/tree. specify target
         -D, --mkdir <dir>            make directory on device
         -R, --rm <path>              remove file or directory on device (directories must be empty)
@@ -95,6 +96,9 @@ The commands below assume that you have an app called `my.app` with bundle id `b
 
     // deploy and debug your app to a connected device
     ios-deploy --debug --bundle my.app
+
+    // deploy, debug and pass environment variables to a connected device
+    ios-deploy --debug --envs DYLD_PRINT_STATISTICS=1 --bundle my.app
 
     // deploy and debug your app to a connected device, skipping any wi-fi connection (use USB)
     ios-deploy --debug --bundle my.app --no-wifi
@@ -140,4 +144,5 @@ The included demo.app represents the minimum required to get code running on iOS
 * `make debug` will install demo.app and launch a LLDB session.
 
 ## Notes
+
 * `--detect_deadlocks` can help to identify an exact state of application's threads in case of a deadlock. It works like this: The user specifies the amount of time ios-deploy runs the app as usual. When the timeout is elapsed ios-deploy starts to print call-stacks of all threads every 5 seconds and the app keeps running. Comparing threads' call-stacks between each other helps to identify the threads which were stuck.
