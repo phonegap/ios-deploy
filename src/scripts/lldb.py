@@ -5,6 +5,7 @@ import shlex
 import lldb
 
 listener = None
+startup_error = lldb.SBError()
 
 def connect_command(debugger, command, result, internal_dict):
     # These two are passed in by the script which loads us
@@ -41,7 +42,6 @@ def connect_command(debugger, command, result, internal_dict):
 def run_command(debugger, command, result, internal_dict):
     device_app = internal_dict['fruitstrap_device_app']
     args = command.split('--',1)
-    error = lldb.SBError()
     lldb.target.modules[0].SetPlatformFileSpec(lldb.SBFileSpec(device_app))
     args_arr = []
     if len(args) > 1:
@@ -62,13 +62,13 @@ def run_command(debugger, command, result, internal_dict):
     envs_arr = envs_arr + shlex.split('{envs}')
     launchInfo.SetEnvironmentEntries(envs_arr, True)
     
-    lldb.target.Launch(launchInfo, error)
+    lldb.target.Launch(launchInfo, startup_error)
     lockedstr = ': Locked'
-    if lockedstr in str(error):
+    if lockedstr in str(startup_error):
        print('\\nDevice Locked\\n')
        os._exit(254)
     else:
-       print(str(error))
+       print(str(startup_error))
 
 def safequit_command(debugger, command, result, internal_dict):
     process = lldb.target.process
@@ -85,6 +85,9 @@ def safequit_command(debugger, command, result, internal_dict):
 def autoexit_command(debugger, command, result, internal_dict):
     global listener
     process = lldb.target.process
+    if not startup_error.Success():
+        print('\\nPROCESS_NOT_STARTED\\n')
+        os._exit({exitcode_app_crash})
 
     output_path = internal_dict['fruitstrap_output_path']
     out = None
