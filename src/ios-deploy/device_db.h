@@ -31,6 +31,7 @@ device_desc device_db[] = {
                           ADD_DEVICE("N78AP",  "iPod Touch 5G",              "iphoneos", "armv7"),
                           ADD_DEVICE("N78AAP", "iPod Touch 5G",              "iphoneos", "armv7"),
                           ADD_DEVICE("N102AP", "iPod Touch 6G",              "iphoneos", "arm64"),
+                          ADD_DEVICE("N112AP", "iPod Touch 7G",              "iphoneos", "arm64"),
 
                           // iPad
 
@@ -45,6 +46,7 @@ device_desc device_db[] = {
                           ADD_DEVICE("P101AP", "iPad 4",                     "iphoneos", "armv7s"),
                           ADD_DEVICE("P102AP", "iPad 4 (GSM)",               "iphoneos", "armv7s"),
                           ADD_DEVICE("P103AP", "iPad 4 (CDMA)",              "iphoneos", "armv7s"),
+                          ADD_DEVICE("J71bAP", "iPad 6",                     "iphoneos", "arm64"),
                           ADD_DEVICE("J71AP",  "iPad Air",                   "iphoneos", "arm64"),
                           ADD_DEVICE("J72AP",  "iPad Air (GSM)",             "iphoneos", "arm64"),
                           ADD_DEVICE("J73AP",  "iPad Air (CDMA)",            "iphoneos", "arm64"),
