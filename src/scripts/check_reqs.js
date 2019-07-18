@@ -25,7 +25,7 @@ xcode_version.on('close', function (code) {
 			console.log('!!!! WARNING:   `--unsafe-perm=true` flag when running `npm install`');
 			console.log('!!!! WARNING:   or else it will fail.');
 			console.log('!!!! WARNING: link:');
-			console.log('!!!! WARNING:   https://github.com/phonegap/ios-deploy#os-x-1011-el-capitan-or-greater');
+			console.log('!!!! WARNING:   https://github.com/ios-control/ios-deploy#os-x-1011-el-capitan-or-greater');
 			console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
 		}
 

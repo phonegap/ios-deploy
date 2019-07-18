@@ -77,9 +77,9 @@ If you are *not* using a node version manager like [nvm](https://github.com/crea
         -r, --uninstall              uninstall the app before install (do not use with -m; app cache and data are cleared) 
         -9, --uninstall_only         uninstall the app ONLY. Use only with -1 <bundle_id> 
         -1, --bundle_id <bundle id>  specify bundle id for list and upload
-        -l, --list                   list files
+        -l, --list[=<dir>]           list all app files or the specified directory
         -o, --upload <file>          upload file
-        -w, --download               download app tree
+        -w, --download[=<path>]      download app tree or the specified file/directory
         -2, --to <target pathname>   use together with up/download file/tree. specify target
         -D, --mkdir <dir>            make directory on device
         -R, --rm <path>              remove file or directory on device (directories must be empty)
@@ -87,6 +87,7 @@ If you are *not* using a node version manager like [nvm](https://github.com/crea
         -e, --exists                 check if the app with given bundle_id is installed or not 
         -B, --list_bundle_id         list bundle_id 
         -W, --no-wifi                ignore wifi devices
+        -O, --output <file>          write stdout and stderr to this file
         --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds
 
 ## Examples
