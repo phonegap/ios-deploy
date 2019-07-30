@@ -1,6 +1,6 @@
 {
   "name": "ios-deploy",
-  "version": "1.9.4",
+  "version": "1.10.0-beta.2",
   "os": [
     "darwin"
   ],
@@ -28,6 +28,12 @@
     "pycompile": "python -m py_compile src/scripts/*.py",
     "postversion": "echo \\\"$npm_package_version\\\" > src/ios-deploy/version.h"
   },
+  "files": [
+    "demo",
+    "src",
+    "ios-deploy.xcodeproj/project.pbxproj",
+    "ios-deploy.xcodeproj/xcshareddata"
+  ],
   "keywords": [
     "ios-deploy",
     "deploy to iOS device"

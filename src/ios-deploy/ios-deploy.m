@@ -20,7 +20,7 @@
 #import "device_db.h"
 
 #define PREP_CMDS_PATH @"/tmp/%@/fruitstrap-lldb-prep-cmds-"
-#define LLDB_SHELL @"lldb -s %@"
+#define LLDB_SHELL @"PATH=/usr/bin /usr/bin/lldb -s %@"
 /*
  * Startup script passed to lldb.
  * To see how xcode interacts with lldb, put this into .lldbinit:
@@ -123,7 +123,9 @@ void on_error(NSString* format, ...)
     NSString* str = [[[NSString alloc] initWithFormat:format arguments:valist] autorelease];
     va_end(valist);
 
-    NSLog(@"[ !! ] %@", str);
+    if (!_json_output) {
+        NSLog(@"[ !! ] %@", str);
+    }
 
     exit(exitcode_error);
 }
@@ -546,6 +548,12 @@ void mount_developer_image(AMDeviceRef device) {
     } else if (result == 0xe8000076 /* already mounted */) {
         NSLogOut(@"[ 95%%] Developer disk image already mounted");
     } else {
+        if (result == 0xe80000e2 /* device locked */) {
+            NSLogOut(@"The device is locked.");
+            NSLogJSON(@{@"Event": @"Error",
+                        @"Status": @"DeviceLocked"
+                        });
+        }
         on_error(@"Unable to mount developer disk image. (%x)", result);
     }
 
@@ -562,7 +570,13 @@ mach_error_t transfer_callback(CFDictionaryRef dict, int arg) {
         CFStringRef path = CFDictionaryGetValue(dict, CFSTR("Path"));
 
         if ((last_path == NULL || !CFEqual(path, last_path)) && !CFStringHasSuffix(path, CFSTR(".ipa"))) {
-            NSLogOut(@"[%3d%%] Copying %@ to device", percent / 2, path);
+            int overall_percent = percent / 2;
+            NSLogOut(@"[%3d%%] Copying %@ to device", overall_percent, path);
+            NSLogJSON(@{@"Event": @"BundleCopy",
+                        @"OverallPercent": @(overall_percent),
+                        @"Percent": @(percent),
+                        @"Path": (__bridge NSString *)path
+                        });
         }
 
         if (last_path != NULL) {
@@ -579,7 +593,13 @@ mach_error_t install_callback(CFDictionaryRef dict, int arg) {
     CFStringRef status = CFDictionaryGetValue(dict, CFSTR("Status"));
     CFNumberGetValue(CFDictionaryGetValue(dict, CFSTR("PercentComplete")), kCFNumberSInt32Type, &percent);
 
-    NSLogOut(@"[%3d%%] %@", (percent / 2) + 50, status);
+    int overall_percent = (percent / 2) + 50;
+    NSLogOut(@"[%3d%%] %@", overall_percent, status);
+    NSLogJSON(@{@"Event": @"BundleInstall",
+                @"OverallPercent": @(overall_percent),
+                @"Percent": @(percent),
+                @"Status": (__bridge NSString *)status
+                });
     return 0;
 }
 
@@ -1120,6 +1140,10 @@ void launch_debugserver_only(AMDeviceRef device, CFURLRef url)
 
     NSLogOut(@"debugserver port: %d", port);
     NSLogOut(@"App path: %@", device_app_path);
+    NSLogJSON(@{@"Event": @"DebugServerLaunched",
+                @"Port": @(port),
+                @"Path": (__bridge NSString *)device_app_path
+                });
 }
 
 CFStringRef get_bundle_id(CFURLRef app_url)
@@ -1323,6 +1347,22 @@ int app_exists(AMDeviceRef device)
     if (appExists)
         return 0;
     return -1;
+}
+
+void get_battery_level(AMDeviceRef device)
+{
+    
+    AMDeviceConnect(device);
+    assert(AMDeviceIsPaired(device));
+    check_error(AMDeviceValidatePairing(device));
+    check_error(AMDeviceStartSession(device));
+
+    CFStringRef result = AMDeviceCopyValue(device, (void*)@"com.apple.mobile.battery", (__bridge CFStringRef)@"BatteryCurrentCapacity");
+    NSLogOut(@"BatteryCurrentCapacity:%@",result);
+    CFRelease(result);
+    
+    check_error(AMDeviceStopSession(device));
+    check_error(AMDeviceDisconnect(device));
 }
 
 void list_bundle_id(AMDeviceRef device)
@@ -1612,6 +1652,8 @@ void handle_device(AMDeviceRef device) {
             uninstall_app(device);
         } else if (strcmp("list_bundle_id", command) == 0) {
             list_bundle_id(device);
+        } else if (strcmp("get_battery_level", command) == 0) {
+            get_battery_level(device);
         }
         exit(0);
     }
@@ -1706,6 +1748,11 @@ void handle_device(AMDeviceRef device) {
         CFRelease(options);
 
         NSLogOut(@"[100%%] Installed package %@", [NSString stringWithUTF8String:app_path]);
+        NSLogJSON(@{@"Event": @"BundleInstall",
+                    @"OverallPercent": @(100),
+                    @"Percent": @(100),
+                    @"Status": @"Complete"
+                    });
     }
 
     if (!debug)
@@ -1744,7 +1791,7 @@ void timeout_callback(CFRunLoopTimerRef timer, void *info) {
             return;
 
         // App running for too long
-        NSLog(@"[ !! ] App is running for too long");
+        NSLogOut(@"[ !! ] App is running for too long");
         exit(exitcode_timeout);
         return;
     } else if ((!found_device) && (!detect_only))  {
@@ -1803,6 +1850,7 @@ void usage(const char* app) {
         @"  -e, --exists                 check if the app with given bundle_id is installed or not \n"
         @"  -B, --list_bundle_id         list bundle_id \n"
         @"  -W, --no-wifi                ignore wifi devices\n"
+        @"  -C, --get_battery_level      get battery current capacity \n"
         @"  -O, --output <file>          write stdout to this file\n"
         @"  -E, --error_output <file>    write stderr to this file\n"
         @"  --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds\n"
@@ -1855,6 +1903,7 @@ int main(int argc, char *argv[]) {
         { "exists", no_argument, NULL, 'e'},
         { "list_bundle_id", no_argument, NULL, 'B'},
         { "no-wifi", no_argument, NULL, 'W'},
+        { "get_battery_level", no_argument, NULL, 'C'},
         { "output", required_argument, NULL, 'O' },
         { "error_output", required_argument, NULL, 'E' },
         { "detect_deadlocks", required_argument, NULL, 1000 },
@@ -1865,7 +1914,7 @@ int main(int argc, char *argv[]) {
     };
     int ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunrILeD:R:i:b:a:t:p:1:2:o:l:w:9BWjNs:OE:", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunrILeD:R:i:b:a:t:p:1:2:o:l:w:9BWjNs:OE:C", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -1970,6 +2019,10 @@ int main(int argc, char *argv[]) {
             break;
         case 'W':
             no_wifi = true;
+            break;
+        case 'C':
+            command_only = true;
+            command = "get_battery_level";
             break;
         case 'O':
             output_path = optarg;
