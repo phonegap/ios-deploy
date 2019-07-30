@@ -146,3 +146,14 @@ The included demo.app represents the minimum required to get code running on iOS
 ## Notes
 
 * `--detect_deadlocks` can help to identify an exact state of application's threads in case of a deadlock. It works like this: The user specifies the amount of time ios-deploy runs the app as usual. When the timeout is elapsed ios-deploy starts to print call-stacks of all threads every 5 seconds and the app keeps running. Comparing threads' call-stacks between each other helps to identify the threads which were stuck.
+
+## License
+
+ios-deploy is available under the provisions of the GNU General Public License,
+version 3 (or later), available here: http://www.gnu.org/licenses/gpl-3.0.html
+
+
+Error codes used for error messages were taken from SDMMobileDevice framework,
+originally reverse engineered by Sam Marshall. SDMMobileDevice is distributed
+under BSD 3-Clause license and is available here:
+https://github.com/samdmarshall/SDMMobileDevice
