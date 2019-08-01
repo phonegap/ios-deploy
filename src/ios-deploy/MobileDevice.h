@@ -66,6 +66,7 @@ typedef unsigned int mach_error_t;
 typedef unsigned int afc_error_t;
 typedef unsigned int usbmux_error_t;
 typedef unsigned int service_conn_t;
+typedef service_conn_t * ServiceConnRef;
 
 struct am_recovery_device;
 
@@ -141,6 +142,8 @@ typedef struct afc_connection {
     void *afc_lock;                 /* 36 */
     unsigned int context;           /* 40 */
 } __attribute__ ((packed)) afc_connection;
+
+typedef struct afc_connection * AFCConnectionRef;
 
 typedef struct afc_directory {
     unsigned char unknown[0];   /* size unknown */
@@ -258,10 +261,10 @@ mach_error_t AMDeviceStartSession(struct am_device *device);
  */
 
 mach_error_t AMDeviceStartService(struct am_device *device, CFStringRef 
-    service_name, service_conn_t *handle, unsigned int *
+    service_name, ServiceConnRef handle, unsigned int *
     unknown);
 
-mach_error_t AMDeviceStartHouseArrestService(struct am_device *device, CFStringRef identifier, void *unknown, service_conn_t *handle, unsigned int *what);
+mach_error_t AMDeviceStartHouseArrestService(struct am_device *device, CFStringRef identifier, void *unknown, ServiceConnRef handle, unsigned int *what);
 
 /* Stops a session. You should do this before accessing services.
  *
@@ -281,10 +284,10 @@ mach_error_t AMDeviceStopSession(struct am_device *device);
  */
 
 afc_error_t AFCConnectionOpen(service_conn_t handle, unsigned int io_timeout,
-    struct afc_connection **conn);
+    AFCConnectionRef *conn);
 
 /* Pass in a pointer to an afc_device_info structure. It will be filled. */
-afc_error_t AFCDeviceInfoOpen(afc_connection *conn, struct
+afc_error_t AFCDeviceInfoOpen(AFCConnectionRef conn, struct
     afc_dictionary **info);
 
 /* Turns debug mode on if the environment variable AFCDEBUG is set to a numeric
@@ -300,7 +303,7 @@ afc_error_t AFCDeviceInfoOpen(afc_connection *conn, struct
  *      MDERR_OK                if successful
  */
 
-afc_error_t AFCDirectoryOpen(afc_connection *conn, const char *path,
+afc_error_t AFCDirectoryOpen(AFCConnectionRef conn, const char *path,
                              struct afc_directory **dir);
 
 /* Acquires the next entry in a directory previously opened with
@@ -313,30 +316,30 @@ afc_error_t AFCDirectoryOpen(afc_connection *conn, const char *path,
  *      MDERR_OK                if successful, even if no entries remain
  */
 
-afc_error_t AFCDirectoryRead(afc_connection *conn/*unsigned int unused*/, struct afc_directory *dir,
+afc_error_t AFCDirectoryRead(AFCConnectionRef conn/*unsigned int unused*/, struct afc_directory *dir,
     char **dirent);
 
-afc_error_t AFCDirectoryClose(afc_connection *conn, struct afc_directory *dir);
-afc_error_t AFCDirectoryCreate(afc_connection *conn, const char *dirname);
-afc_error_t AFCRemovePath(afc_connection *conn, const char *dirname);
-afc_error_t AFCRenamePath(afc_connection *conn, const char *from, const char *to);
-afc_error_t AFCLinkPath(afc_connection *conn, long long int linktype, const char *target, const char *linkname);
+afc_error_t AFCDirectoryClose(AFCConnectionRef conn, struct afc_directory *dir);
+afc_error_t AFCDirectoryCreate(AFCConnectionRef conn, const char *dirname);
+afc_error_t AFCRemovePath(AFCConnectionRef conn, const char *dirname);
+afc_error_t AFCRenamePath(AFCConnectionRef conn, const char *from, const char *to);
+afc_error_t AFCLinkPath(AFCConnectionRef conn, long long int linktype, const char *target, const char *linkname);
 
 /* Returns the context field of the given AFC connection. */
-unsigned int AFCConnectionGetContext(afc_connection *conn);
+unsigned int AFCConnectionGetContext(AFCConnectionRef conn);
 
 /* Returns the fs_block_size field of the given AFC connection. */
-unsigned int AFCConnectionGetFSBlockSize(afc_connection *conn);
+unsigned int AFCConnectionGetFSBlockSize(AFCConnectionRef conn);
 
 /* Returns the io_timeout field of the given AFC connection. In iTunes this is
  * 0. */
-unsigned int AFCConnectionGetIOTimeout(afc_connection *conn);
+unsigned int AFCConnectionGetIOTimeout(AFCConnectionRef conn);
 
 /* Returns the sock_block_size field of the given AFC connection. */
-unsigned int AFCConnectionGetSocketBlockSize(afc_connection *conn);
+unsigned int AFCConnectionGetSocketBlockSize(AFCConnectionRef conn);
 
 /* Closes the given AFC connection. */
-afc_error_t AFCConnectionClose(afc_connection *conn);
+afc_error_t AFCConnectionClose(AFCConnectionRef conn);
 
 /* Registers for device notifications related to the restore process. unknown0
  * is zero when iTunes calls this. In iTunes,
@@ -392,19 +395,19 @@ CFMutableDictionaryRef AMRestoreCreateDefaultOptions(CFAllocatorRef allocator);
  * ------------------------------------------------------------------------- */
 
 /* mode 2 = read, mode 3 = write */
-afc_error_t AFCFileRefOpen(afc_connection *conn, const char *path,
+afc_error_t AFCFileRefOpen(AFCConnectionRef conn, const char *path,
     unsigned long long mode, afc_file_ref *ref);
-afc_error_t AFCFileRefSeek(afc_connection *conn, afc_file_ref ref,
+afc_error_t AFCFileRefSeek(AFCConnectionRef conn, afc_file_ref ref,
     unsigned long long offset1, unsigned long long offset2);
-afc_error_t AFCFileRefRead(afc_connection *conn, afc_file_ref ref,
+afc_error_t AFCFileRefRead(AFCConnectionRef conn, afc_file_ref ref,
     void *buf, size_t *len);
-afc_error_t AFCFileRefSetFileSize(afc_connection *conn, afc_file_ref ref,
+afc_error_t AFCFileRefSetFileSize(AFCConnectionRef conn, afc_file_ref ref,
     unsigned long long offset);
-afc_error_t AFCFileRefWrite(afc_connection *conn, afc_file_ref ref,
+afc_error_t AFCFileRefWrite(AFCConnectionRef conn, afc_file_ref ref,
     const void *buf, size_t len);
-afc_error_t AFCFileRefClose(afc_connection *conn, afc_file_ref ref);
+afc_error_t AFCFileRefClose(AFCConnectionRef conn, afc_file_ref ref);
 
-afc_error_t AFCFileInfoOpen(afc_connection *conn, const char *path, struct
+afc_error_t AFCFileInfoOpen(AFCConnectionRef conn, const char *path, struct
     afc_dictionary **info);
 afc_error_t AFCKeyValueRead(struct afc_dictionary *dict, char **key, char **
     val);
@@ -429,7 +432,7 @@ mach_error_t AMDeviceEnterRecovery(struct am_device *device);
 mach_error_t AMDeviceDisconnect(struct am_device *device);
 mach_error_t AMDeviceRetain(struct am_device *device);
 mach_error_t AMDeviceRelease(struct am_device *device);
-CFStringRef AMDeviceCopyValue(struct am_device *device, unsigned int, CFStringRef cfstring);
+CFStringRef AMDeviceCopyValue(struct am_device *device, void*, CFStringRef cfstring);
 CFStringRef AMDeviceCopyDeviceIdentifier(struct am_device *device);
 
 typedef void (*notify_callback)(CFStringRef notification, void *data);

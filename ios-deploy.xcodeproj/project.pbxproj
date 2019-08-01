@@ -180,7 +180,6 @@
 				C0CD3D981F59D20100F954DB /* ShellScript */,
 				7E70898B1B587BF3004D23AA /* Frameworks */,
 				7EDCC3CC1C45DC89002F9851 /* Sources */,
-				C0CD3D9B1F59DA8300F954DB /* Run Script */,
 			);
 			buildRules = (
 			);
@@ -251,7 +250,7 @@
 			};
 			buildConfigurationList = 7E7089891B587BF3004D23AA /* Build configuration list for PBXProject "ios-deploy" */;
 			compatibilityVersion = "Xcode 3.2";
-			developmentRegion = English;
+			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
@@ -330,21 +329,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"${PROJECT_DIR}/_Frameworks\"\nrsync -r /System/Library/PrivateFrameworks/MobileDevice.framework \"${PROJECT_DIR}/_Frameworks\" --exclude=XPCServices --links\n";
-		};
-		C0CD3D9B1F59DA8300F954DB /* Run Script */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-			);
-			name = "Run Script";
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "rm -rf \"${PROJECT_DIR}/_Frameworks\"\n";
+			shellScript = "mkdir -p \"${PROJECT_DIR}/_Frameworks\"\n\n# copy over MobileDevice.framework from its location\nMD_FRAMEWORK_LOCATION=/System/Library/PrivateFrameworks/MobileDevice.framework\nif [ -d \"$MD_FRAMEWORK_LOCATION\" ]; then\n    rsync -r $MD_FRAMEWORK_LOCATION \"${PROJECT_DIR}/_Frameworks\" --exclude=XPCServices --links\nfi\n\n# check if this new location exists, if it does, copy it instead\nNEW_MD_FRAMEWORK_LOCATION=/Library/Apple/System/Library/PrivateFrameworks/MobileDevice.framework\nif [ -d \"$NEW_MD_FRAMEWORK_LOCATION\" ]; then\nrsync -r $NEW_MD_FRAMEWORK_LOCATION \"${PROJECT_DIR}/_Frameworks\" --exclude=XPCServices --links\nfi\n\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
