@@ -122,7 +122,7 @@ const int exitcode_app_crash = 254;
         {                                                                       \
             const char* msg = get_error_message(err);                           \
             NSString *description = msg ? [NSString stringWithUTF8String:msg] : @"unknown."; \
-            NSLogJSON(@{@"Event": @"Error", @"Code": @(err), @"Description": description}); \
+            NSLogJSON(@{@"Event": @"Error", @"Code": @(err), @"Status": description}); \
             on_error(@"Error 0x%x: %@ " #call, err, description);               \
         }                                                                       \
     } while (false);
