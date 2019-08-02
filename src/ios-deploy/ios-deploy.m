@@ -121,8 +121,9 @@ const int exitcode_app_crash = 254;
         if (err != 0)                                                           \
         {                                                                       \
             const char* msg = get_error_message(err);                           \
-            /*on_error("Error 0x%x: %s " #call, err, msg ? msg : "unknown.");*/    \
-            on_error(@"Error 0x%x: %@ " #call, err, msg ? [NSString stringWithUTF8String:msg] : @"unknown."); \
+            NSString *description = msg ? [NSString stringWithUTF8String:msg] : @"unknown."; \
+            NSLogJSON(@{@"Event": @"Error", @"Code": @(err), @"Description": description}); \
+            on_error(@"Error 0x%x: %@ " #call, err, description);               \
         }                                                                       \
     } while (false);
 
@@ -561,6 +562,7 @@ void mount_developer_image(AMDeviceRef device) {
         if (result == 0xe80000e2 /* device locked */) {
             NSLogOut(@"The device is locked.");
             NSLogJSON(@{@"Event": @"Error",
+                        @"Code": @(result),
                         @"Status": @"DeviceLocked"
                         });
         }
