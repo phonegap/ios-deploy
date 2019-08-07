@@ -553,7 +553,7 @@ void mount_developer_image(AMDeviceRef device) {
     CFDictionaryRef options = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, 2, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     CFRelease(sig_data);
 
-    int result = AMDeviceMountImage(device, image_path, options, &mount_callback, 0);
+    unsigned int result = (unsigned int)AMDeviceMountImage(device, image_path, options, &mount_callback, 0);
     if (result == 0) {
         NSLogOut(@"[ 95%%] Developer disk image mounted successfully");
     } else if (result == 0xe8000076 /* already mounted */) {
