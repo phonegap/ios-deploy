@@ -1831,7 +1831,7 @@ void usage(const char* app) {
         @"  -t, --timeout <timeout>      number of seconds to wait for a device to be connected\n"
         @"  -u, --unbuffered             don't buffer stdout\n"
         @"  -n, --nostart                do not start the app when debugging\n"
-        @"  -N, --nolldb                 start debugserver only. do not run lldb\n"
+        @"  -N, --nolldb                 start debugserver only. do not run lldb. Can not be used with args or envs options\n"
         @"  -I, --noninteractive         start in non interactive mode (quit when app crashes or exits)\n"
         @"  -L, --justlaunch             just launch the app and exit lldb\n"
         @"  -v, --verbose                enable verbose output\n"
@@ -2036,6 +2036,11 @@ int main(int argc, char *argv[]) {
             usage(argv[0]);
             return exitcode_error;
         }
+    }
+    
+    if (debugserver_only && (args || envs)) {
+        usage(argv[0]);
+        on_error(@"The --args and --envs options can not be combined with --nolldb.");
     }
 
     if (!app_path && !detect_only && !command_only) {
