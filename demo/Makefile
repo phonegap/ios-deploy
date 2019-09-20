@@ -1,7 +1,5 @@
-IOS_SDK_VERSION = 9.1
-
-IOS_CC = gcc -ObjC
-IOS_SDK = $(shell xcode-select --print-path)/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS$(IOS_SDK_VERSION).sdk
+IOS_CC = clang -ObjC
+IOS_SDK = $(shell xcrun --sdk iphoneos --show-sdk-path)
 
 all: clean demo.app
 

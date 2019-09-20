@@ -1,0 +1,15 @@
+root: true
+
+extends: semistandard
+
+rules:
+  indent:
+    - error
+    - 4
+
+  no-unused-vars:
+    - error
+    - args: after-used
+
+  # excpetions specified in:
+  # - src/scripts/.eslintrc.yml
