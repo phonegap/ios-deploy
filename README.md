@@ -69,6 +69,7 @@ If you are *not* using a node version manager like [nvm](https://github.com/crea
         -t, --timeout <timeout>      number of seconds to wait for a device to be connected
         -u, --unbuffered             don't buffer stdout
         -n, --nostart                do not start the app when debugging
+        -N, --nolldb                 start debugserver only. do not run lldb. Can not be used with args or envs options
         -I, --noninteractive         start in non interactive mode (quit when app crashes or exits)
         -L, --justlaunch             just launch the app and exit lldb
         -v, --verbose                enable verbose output
@@ -83,12 +84,16 @@ If you are *not* using a node version manager like [nvm](https://github.com/crea
         -2, --to <target pathname>   use together with up/download file/tree. specify target
         -D, --mkdir <dir>            make directory on device
         -R, --rm <path>              remove file or directory on device (directories must be empty)
+        -X, --rmtree <path>          remove directory and all contained files recursively on device
         -V, --version                print the executable version 
         -e, --exists                 check if the app with given bundle_id is installed or not 
         -B, --list_bundle_id         list bundle_id 
         -W, --no-wifi                ignore wifi devices
-        -O, --output <file>          write stdout and stderr to this file
+        -C, --get_battery_level      get battery current capacity 
+        -O, --output <file>          write stdout to this file
+        -E, --error_output <file>    write stderr to this file
         --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds
+        -j, --json                   format output as JSON
 
 ## Examples
 
