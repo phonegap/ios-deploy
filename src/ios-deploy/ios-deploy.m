@@ -346,7 +346,9 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
                 device_name = NULL,
                 model_name = NULL,
                 sdk_name = NULL,
-                arch_name = NULL;
+                arch_name = NULL,
+                product_version = NULL,
+                build_version = NULL;
 
     AMDeviceConnect(device);
 
@@ -364,12 +366,16 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
     model_name = dev.name;
     sdk_name = dev.sdk;
     arch_name = dev.arch;
+    product_version = AMDeviceCopyValue(device, 0, CFSTR("ProductVersion"));
+    build_version = AMDeviceCopyValue(device, 0, CFSTR("BuildVersion"));
 
     NSLogVerbose(@"Hardware Model: %@", model);
     NSLogVerbose(@"Device Name: %@", device_name);
     NSLogVerbose(@"Model Name: %@", model_name);
     NSLogVerbose(@"SDK Name: %@", sdk_name);
     NSLogVerbose(@"Architecture Name: %@", arch_name);
+    NSLogVerbose(@"Product Version: %@", product_version);
+    NSLogVerbose(@"Build Version: %@", build_version);
 
     if (device_name != NULL) {
         full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@, %@, %@, %@) a.k.a. '%@'"), device_udid, model, model_name, sdk_name, arch_name, device_name);
@@ -385,6 +391,10 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
         CFRelease(device_name);
     if(model_name != NULL)
         CFRelease(model_name);
+    if(product_version)
+        CFRelease(product_version);
+    if(build_version)
+        CFRelease(build_version);
 
     return full_name;
 }
@@ -1198,18 +1208,30 @@ void read_dir(AFCConnectionRef afc_conn_p, const char* dir,
         return;
     }
 
+    // Show the file size after the file name in verbose mode
+    long file_size = 0;
     while((AFCKeyValueRead(afc_dict_p,&key,&val) == 0) && key && val) {
         if (strcmp(key,"st_ifmt")==0) {
             not_dir = strcmp(val,"S_IFDIR");
-            break;
+        }
+        if (strcmp(key, "st_size") == 0) {
+            file_size = strtol(val, NULL, 10);
         }
     }
     AFCKeyValueClose(afc_dict_p);
-
-    if (not_dir) {
-        NSLogOut(@"%@", [NSString stringWithUTF8String:dir]);
+	
+    if (verbose) {
+        if (not_dir) {
+            NSLogOut(@"%@ %d", [NSString stringWithUTF8String:dir], file_size);
+        } else {
+            NSLogOut(@"%@/ %d", [NSString stringWithUTF8String:dir], file_size);
+        }
     } else {
-        NSLogOut(@"%@/", [NSString stringWithUTF8String:dir]);
+        if (not_dir) {
+            NSLogOut(@"%@", [NSString stringWithUTF8String:dir]);
+        } else {
+            NSLogOut(@"%@/", [NSString stringWithUTF8String:dir]);
+        }
     }
 
     if (not_dir) {
@@ -1567,6 +1589,73 @@ void remove_path(AMDeviceRef device) {
     check_error(AFCConnectionClose(afc_conn_p));
 }
 
+void remove_tree(afc_connection* afc_conn_p, const char* dir)
+{
+    char *dir_ent;
+    
+    afc_dictionary* afc_dict_p;
+    char *key, *val;
+    int not_dir = 0;
+    
+    unsigned int code = AFCFileInfoOpen(afc_conn_p, dir, &afc_dict_p);
+    if (code != 0) {
+        // there was a problem reading or opening the file to get info on it, abort
+        return;
+    }
+    
+    while((AFCKeyValueRead(afc_dict_p,&key,&val) == 0) && key && val) {
+        if (strcmp(key,"st_ifmt")==0) {
+            not_dir = strcmp(val,"S_IFDIR");
+        }
+    }
+    AFCKeyValueClose(afc_dict_p);
+    
+    if (not_dir) {
+        // Not a directory; asssume it's a leaf file - delete it
+        NSLogVerbose(@"Deleting file %s", dir);
+        assert(AFCRemovePath(afc_conn_p, dir) == 0);
+        return;
+    }
+    
+    afc_directory* afc_dir_p;
+    afc_error_t err = AFCDirectoryOpen(afc_conn_p, dir, &afc_dir_p);
+    
+    if (err != 0) {
+        // Couldn't open dir - we already checked for the file case above, so something is probably wrong...
+        return;
+    }
+    
+    while(true) {
+        err = AFCDirectoryRead(afc_conn_p, afc_dir_p, &dir_ent);
+        
+        if (err != 0 || !dir_ent)
+            break;
+        
+        if (strcmp(dir_ent, ".") == 0 || strcmp(dir_ent, "..") == 0)
+            continue;
+        
+        char* dir_joined = malloc(strlen(dir) + strlen(dir_ent) + 2);
+        strcpy(dir_joined, dir);
+        if (dir_joined[strlen(dir)-1] != '/')
+            strcat(dir_joined, "/");
+        strcat(dir_joined, dir_ent);
+        remove_tree(afc_conn_p, dir_joined);
+        free(dir_joined);
+    }
+    
+    AFCDirectoryClose(afc_conn_p, afc_dir_p);
+    // Finished clearing this directory's descendents - it is now empty, so we can delete it
+    NSLogVerbose(@"Deleting directory %s", dir);
+    assert(AFCRemovePath(afc_conn_p, dir) == 0);
+}
+
+void rmtree(AMDeviceRef device) {
+    AFCConnectionRef afc_conn_p = start_house_arrest_service(device);
+    assert(afc_conn_p);
+    remove_tree(afc_conn_p, target_filename);
+    assert(AFCConnectionClose(afc_conn_p) == 0);
+}
+
 void uninstall_app(AMDeviceRef device) {
     CFRetain(device); // don't know if this is necessary?
 
@@ -1646,6 +1735,8 @@ void handle_device(AMDeviceRef device) {
             make_directory(device);
         } else if (strcmp("rm", command) == 0) {
             remove_path(device);
+        } else if (strcmp("rmtree", command) == 0) {
+            rmtree(device);
         } else if (strcmp("exists", command) == 0) {
             exit(app_exists(device));
         } else if (strcmp("uninstall_only", command) == 0) {
@@ -1846,6 +1937,7 @@ void usage(const char* app) {
         @"  -2, --to <target pathname>   use together with up/download file/tree. specify target\n"
         @"  -D, --mkdir <dir>            make directory on device\n"
         @"  -R, --rm <path>              remove file or directory on device (directories must be empty)\n"
+        @"  -X, --rmtree <path>          remove directory and all contained files recursively on device\n"
         @"  -V, --version                print the executable version \n"
         @"  -e, --exists                 check if the app with given bundle_id is installed or not \n"
         @"  -B, --list_bundle_id         list bundle_id \n"
@@ -1898,6 +1990,7 @@ int main(int argc, char *argv[]) {
         { "to", required_argument, NULL, '2'},
         { "mkdir", required_argument, NULL, 'D'},
         { "rm", required_argument, NULL, 'R'},
+        { "rmtree",required_argument, NULL, 'X'},
         { "exists", no_argument, NULL, 'e'},
         { "list_bundle_id", no_argument, NULL, 'B'},
         { "no-wifi", no_argument, NULL, 'W'},
@@ -1910,7 +2003,7 @@ int main(int argc, char *argv[]) {
     };
     int ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunrILeD:R:i:b:a:t:p:1:2:o:l:w:9BWjNs:OE:C", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunrILeD:R:X:i:b:a:t:p:1:2:o:l:w:9BWjNs:OE:C", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -2004,6 +2097,11 @@ int main(int argc, char *argv[]) {
             command_only = true;
             target_filename = optarg;
             command = "rm";
+            break;
+        case 'X':
+            command_only = true;
+            target_filename = optarg;
+            command = "rmtree";
             break;
         case 'e':
             command_only = true;
