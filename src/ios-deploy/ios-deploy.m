@@ -994,7 +994,8 @@ void lldb_finished_handler(int signum)
     _exit(WEXITSTATUS(status));
 }
 
-void bring_process_to_foreground() {
+pid_t bring_process_to_foreground() {
+    pid_t fgpid = tcgetpgrp(STDIN_FILENO);
     if (setpgid(0, 0) == -1)
         perror("setpgid failed");
 
@@ -1002,6 +1003,7 @@ void bring_process_to_foreground() {
     if (tcsetpgrp(STDIN_FILENO, getpid()) == -1)
         perror("tcsetpgrp failed");
     signal(SIGTTOU, SIG_DFL);
+    return fgpid;
 }
 
 void setup_dummy_pipe_on_stdin(int pfd[2]) {
@@ -1051,12 +1053,12 @@ void launch_debugger(AMDeviceRef device, CFURLRef url) {
         signal(SIGHUP, SIG_DFL);
         signal(SIGLLDB, SIG_DFL);
         child = getpid();
-
+        pid_t oldfgpid = 0;
         int pfd[2] = {-1, -1};
-        if (isatty(STDIN_FILENO))
+        if (interactive && isatty(STDIN_FILENO))
             // If we are running on a terminal, then we need to bring process to foreground for input
             // to work correctly on lldb's end.
-            bring_process_to_foreground();
+            oldfgpid = bring_process_to_foreground();
         else
             // If lldb is running in a non terminal environment, then it freaks out spamming "^D" and
             // "quit". It seems this is caused by read() on stdin returning EOF in lldb. To hack around
@@ -1080,6 +1082,10 @@ void launch_debugger(AMDeviceRef device, CFURLRef url) {
 
         // Notify parent we're exiting
         kill(parent, SIGLLDB);
+
+        if (oldfgpid) {
+            tcsetpgrp(STDIN_FILENO, oldfgpid);
+        }
         // Pass lldb exit code
         _exit(WEXITSTATUS(status));
     } else if (pid > 0) {
