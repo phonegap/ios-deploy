@@ -290,7 +290,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"${PROJECT_DIR}/_Frameworks\"\nrsync -r /System/Library/PrivateFrameworks/MobileDevice.framework \"${PROJECT_DIR}/_Frameworks\" --exclude=XPCServices --links\n";
+			shellScript = "mkdir -p \"${PROJECT_DIR}/_Frameworks\"\n\n# copy over MobileDevice.framework from its location\nMD_FRAMEWORK_LOCATION=/System/Library/PrivateFrameworks/MobileDevice.framework\nif [ -d \"$MD_FRAMEWORK_LOCATION\" ]; then\n    rsync -r $MD_FRAMEWORK_LOCATION \"${PROJECT_DIR}/_Frameworks\" --exclude=XPCServices --links\nfi\n\n# check if this new location exists, if it does, copy it instead\nNEW_MD_FRAMEWORK_LOCATION=/Library/Apple/System/Library/PrivateFrameworks/MobileDevice.framework\nif [ -d \"$NEW_MD_FRAMEWORK_LOCATION\" ]; then\nrsync -r $NEW_MD_FRAMEWORK_LOCATION \"${PROJECT_DIR}/_Frameworks\" --exclude=XPCServices --links\nfi\n\n";
 		};
 		3BF32EF41F5A217100E1699B /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
