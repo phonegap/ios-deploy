@@ -121,8 +121,9 @@ const int exitcode_app_crash = 254;
         if (err != 0)                                                           \
         {                                                                       \
             const char* msg = get_error_message(err);                           \
-            /*on_error("Error 0x%x: %s " #call, err, msg ? msg : "unknown.");*/    \
-            on_error(@"Error 0x%x: %@ " #call, err, msg ? [NSString stringWithUTF8String:msg] : @"unknown."); \
+            NSString *description = msg ? [NSString stringWithUTF8String:msg] : @"unknown."; \
+            NSLogJSON(@{@"Event": @"Error", @"Code": @(err), @"Status": description}); \
+            on_error(@"Error 0x%x: %@ " #call, err, description);               \
         }                                                                       \
     } while (false);
 
@@ -552,18 +553,24 @@ void mount_developer_image(AMDeviceRef device) {
     CFDictionaryRef options = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, 2, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     CFRelease(sig_data);
 
-    int result = AMDeviceMountImage(device, image_path, options, &mount_callback, 0);
+    unsigned int result = (unsigned int)AMDeviceMountImage(device, image_path, options, &mount_callback, 0);
     if (result == 0) {
         NSLogOut(@"[ 95%%] Developer disk image mounted successfully");
     } else if (result == 0xe8000076 /* already mounted */) {
         NSLogOut(@"[ 95%%] Developer disk image already mounted");
     } else {
-        if (result == 0xe80000e2 /* device locked */) {
-            NSLogOut(@"The device is locked.");
+        if (result != 0) {
+            const char* msg = get_error_message(result);
+            NSString *description = @"unknown.";
+            if (msg) {
+                description = [NSString stringWithUTF8String:msg];
+                NSLogOut(@"Error: %@", description);
+            }
             NSLogJSON(@{@"Event": @"Error",
-                        @"Status": @"DeviceLocked"
-                        });
+                        @"Code": @(result),
+                        @"Status": description});
         }
+        
         on_error(@"Unable to mount developer disk image. (%x)", result);
     }
 
@@ -1824,7 +1831,7 @@ void usage(const char* app) {
         @"  -t, --timeout <timeout>      number of seconds to wait for a device to be connected\n"
         @"  -u, --unbuffered             don't buffer stdout\n"
         @"  -n, --nostart                do not start the app when debugging\n"
-        @"  -N, --nolldb                 start debugserver only. do not run lldb\n"
+        @"  -N, --nolldb                 start debugserver only. do not run lldb. Can not be used with args or envs options\n"
         @"  -I, --noninteractive         start in non interactive mode (quit when app crashes or exits)\n"
         @"  -L, --justlaunch             just launch the app and exit lldb\n"
         @"  -v, --verbose                enable verbose output\n"
@@ -2029,6 +2036,11 @@ int main(int argc, char *argv[]) {
             usage(argv[0]);
             return exitcode_error;
         }
+    }
+    
+    if (debugserver_only && (args || envs)) {
+        usage(argv[0]);
+        on_error(@"The --args and --envs options can not be combined with --nolldb.");
     }
 
     if (!app_path && !detect_only && !command_only) {
