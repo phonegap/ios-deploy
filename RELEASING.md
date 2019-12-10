@@ -18,3 +18,15 @@ git tag $PKG_VER
 git push origin master
 git push origin $PKG_VER
 ```
+
+## 4. Publish to npm
+
+```
+npm publish
+```
+
+## 5. Publish to Homebrew
+
+```
+brew bump-formula-pr --url="https://github.com/ios-control/ios-deploy/archive/${PKG_VER}.tar.gz" ios-deploy
+```
