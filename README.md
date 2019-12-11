@@ -21,41 +21,24 @@ The 1.x branch has been archived (renamed for now), all development is to be on 
 
 ## Installation
 
-ios-deploy installation is made simple using the node.js package manager.  If you use [Homebrew](https://brew.sh/), install [node.js](https://nodejs.org):
-
+If you have previously installed ios-deploy via `npm`, uninstall it by running:
 ```
-brew install node
-```
-
-Now install ios-deploy with the [node.js](https://nodejs.org) package manager:
-
-```
-npm install -g ios-deploy
+sudo npm uninstall -g ios-deploy
 ```
 
-To build from source:
+Install ios-deploy via [Homebrew](https://brew.sh/) by running:
 
 ```
-xcodebuild
+brew install ios-deploy
 ```
-
-This will build `ios-deploy` into the `build/Release` folder.
 
 ## Testing
 
 Run:
 
 ```
-npm install && npm test
+python -m py_compile src/scripts/*.py && xcodebuild -target ios-deploy-lib && xcodebuild test -scheme ios-deploy-tests
 ```
-
-### OS X 10.11 El Capitan or greater
-
-If you are *not* using a node version manager like [nvm](https://github.com/creationix/nvm) or [n](https://github.com/tj/n), you may have to do either of these three things below when under El Capitan:
-
-1. Add the `--unsafe-perm=true` flag  when installing ios-deploy
-2. Add the `--allow-root` flag  when installing ios-deploy
-3. Ensure the `nobody` user has write access to `/usr/local/lib/node_modules/ios-deploy/ios-deploy`
 
 ## Usage
 
