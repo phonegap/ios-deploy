@@ -61,6 +61,8 @@ device_desc device_db[] = {
                           ADD_DEVICE("J72bAP", "iPad (2018)",                "iphoneos", "arm64"),
                           ADD_DEVICE("J217AP", "iPad Air 3",                 "iphoneos", "arm64e"),
                           ADD_DEVICE("J218AP", "iPad Air 3 (Cellular)",      "iphoneos", "arm64e"),
+                          ADD_DEVICE("J171AP", "iPad 7",                     "iphoneos", "arm64"),
+                          ADD_DEVICE("J172AP", "iPad 7 (Cellular)",          "iphoneos", "arm64"),
 
                           // iPad Pro
 
@@ -76,16 +78,8 @@ device_desc device_db[] = {
                           ADD_DEVICE("J317xAP", "iPad Pro (11\")",           "iphoneos", "arm64e"),
                           ADD_DEVICE("J318AP",  "iPad Pro (11\")",           "iphoneos", "arm64e"),
                           ADD_DEVICE("J318xAP", "iPad Pro (11\")",           "iphoneos", "arm64e"),
-                          ADD_DEVICE("J318AP",  "iPad Pro (11\")",           "iphoneos", "arm64e"),
-                          ADD_DEVICE("J318xAP", "iPad Pro (11\")",           "iphoneos", "arm64e"),
-                          ADD_DEVICE("J318AP",  "iPad Pro (11\")",           "iphoneos", "arm64e"),
-                          ADD_DEVICE("J318xAP", "iPad Pro (11\")",           "iphoneos", "arm64e"),
                           ADD_DEVICE("J320AP",  "iPad Pro 3G (12.9\")",      "iphoneos", "arm64e"),
                           ADD_DEVICE("J320xAP", "iPad Pro 3G (12.9\")",      "iphoneos", "arm64e"),
-                          ADD_DEVICE("J321AP",  "iPad Pro 3G (12.9\")",      "iphoneos", "arm64e"),
-                          ADD_DEVICE("J321xAP", "iPad Pro 3G (12.9\")",      "iphoneos", "arm64e"),
-                          ADD_DEVICE("J321AP",  "iPad Pro 3G (12.9\")",      "iphoneos", "arm64e"),
-                          ADD_DEVICE("J321xAP", "iPad Pro 3G (12.9\")",      "iphoneos", "arm64e"),
                           ADD_DEVICE("J321AP",  "iPad Pro 3G (12.9\")",      "iphoneos", "arm64e"),
                           ADD_DEVICE("J321xAP", "iPad Pro 3G (12.9\")",      "iphoneos", "arm64e"),
 
@@ -145,6 +139,9 @@ device_desc device_db[] = {
                           ADD_DEVICE("N841AP", "iPhone XR",                  "iphoneos", "arm64e"),
                           ADD_DEVICE("D321AP", "iPhone XS",                  "iphoneos", "arm64e"),
                           ADD_DEVICE("D331pAP","iPhone XS Max",              "iphoneos", "arm64e"),
+                          ADD_DEVICE("N104AP", "iPhone 11",                  "iphoneos", "arm64e"),
+                          ADD_DEVICE("D421AP", "iPhone 11 Pro",              "iphoneos", "arm64e"),
+                          ADD_DEVICE("D431AP", "iPhone 11 Pro Max",          "iphoneos", "arm64e"),
 
                           // Apple TV
 
