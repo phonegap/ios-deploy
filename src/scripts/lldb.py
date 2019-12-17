@@ -63,7 +63,10 @@ def run_command(debugger, command, result, internal_dict):
     launchInfo.SetEnvironmentEntries(envs_arr, True)
     
     #This env variable enables launch time tracking for pre-main application state
-    launchInfo.SetEnvironmentEntries(['DYLD_PRINT_STATISTICS=1'], True)
+    launchInfo.SetEnvironmentEntries([
+    'DYLD_PRINT_STATISTICS=1',
+    'OS_ACTIVITY_DT_MODE=enable',
+    'DYLD_LIBRARY_PATH=/usr/lib/system/introspection'], True)
     
     lldb.target.Launch(launchInfo, startup_error)
     lockedstr = ': Locked'
