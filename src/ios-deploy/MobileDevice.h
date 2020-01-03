@@ -454,7 +454,6 @@ void AMDAddLogFileDescriptor(int fd);
 
 typedef int (*am_device_install_application_callback)(CFDictionaryRef, int);
 
-mach_error_t AMDeviceInstallApplicationBundle(am_device device, CFStringRef path, CFDictionaryRef options, am_device_install_application_callback callback, void *user);
 mach_error_t AMDeviceInstallApplication(service_conn_t socket, CFStringRef path, CFDictionaryRef options, am_device_install_application_callback callback, void *user);
 mach_error_t AMDeviceTransferApplication(service_conn_t socket, CFStringRef path, CFDictionaryRef options, am_device_install_application_callback callbackj, void *user);
 

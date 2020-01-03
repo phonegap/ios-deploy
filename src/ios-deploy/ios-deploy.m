@@ -78,7 +78,7 @@ mach_error_t AMDeviceCreateHouseArrestService(AMDeviceRef device, CFStringRef id
 CFSocketNativeHandle  AMDServiceConnectionGetSocket(ServiceConnRef con);
 int AMDeviceSecureTransferPath(int zero, AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
 int AMDeviceSecureInstallApplication(int zero, AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
-int AMDeviceSecureInstallApplicationBundle(AMDeviceRef device, NSURL *url, NSDictionary<NSString *, NSObject *> *options, _Nullable AMDeviceInstallCallback callback, void *_Nullable context);
+int AMDeviceSecureInstallApplicationBundle(AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
 int AMDeviceMountImage(AMDeviceRef device, CFStringRef image, CFDictionaryRef options, void *callback, int cbarg);
 mach_error_t AMDeviceLookupApplications(AMDeviceRef device, CFDictionaryRef options, CFDictionaryRef *result);
 int AMDeviceGetInterfaceType(AMDeviceRef device);
@@ -1756,39 +1756,56 @@ void handle_device(AMDeviceRef device) {
 
           //mach_error_t result = AMDeviceInstallApplication(installFd, path, options, install_callback, NULL);
           check_error(AMDeviceSecureInstallApplication(0, device, url, options, install_callback, 0));
-
-          CFRelease(options);
         } else {
           if (app_deltas == NULL) {
             on_error(@"[ ERROR ] An app delta directory is required for incremental installations.");
           }
-          NSString *extracted_bundle_id = nil;
+          CFStringRef extracted_bundle_id = NULL;
           CFStringRef extracted_bundle_id_ref = get_bundle_id(url);
           if (bundle_id != NULL) {
-            extracted_bundle_id = [NSString stringWithUTF8String:bundle_id];
+            extracted_bundle_id = CFStringCreateWithCString(NULL, bundle_id, kCFStringEncodingUTF8);
+            CFRelease(extracted_bundle_id_ref);
           } else {
             if (extracted_bundle_id_ref == NULL) {
               on_error(@"[ ERROR] Could not determine bundle id.");
             }
-            extracted_bundle_id = (__bridge NSString *)extracted_bundle_id_ref;
+            extracted_bundle_id = extracted_bundle_id_ref;
           }
 
-
+          CFStringRef deltas_path =
+            CFStringCreateWithCString(NULL, app_deltas, kCFStringEncodingUTF8);
+          CFURLRef deltas_relative_url =
+            CFURLCreateWithFileSystemPath(NULL, deltas_path, kCFURLPOSIXPathStyle, false);
+          CFURLRef app_deltas_url = CFURLCopyAbsoluteURL(deltas_relative_url);
           // These values were determined by inspecting Xcode 11.1 logs with the Console app.
-          NSURL *app_deltas_url = [NSURL fileURLWithPath:@(app_deltas) isDirectory:YES];
-          NSDictionary *options = @{
-            @"CFBundleIdentifier": extracted_bundle_id,
-            @"CloseOnInvalidate": @1,
-            @"InvalidateOnDetach": @1,
-            @"IsUserInitiated": @1,
-            @"PackageType": @"Developer",
-            @"PreferWifi": @(!no_wifi),
-            @"ShadowParentKey": app_deltas_url
+          CFStringRef keys[] = {
+            CFSTR("CFBundleIdentifier"),
+            CFSTR("CloseOnInvalidate"),
+            CFSTR("InvalidateOnDetach"),
+            CFSTR("IsUserInitiated"),
+            CFSTR("PackageType"),
+            CFSTR("PreferWifi"),
+            CFSTR("ShadowParentKey"),
           };
 
-          NSURL *app_url = [NSURL fileURLWithPath:(NSString *)path isDirectory:YES];
-          check_error(AMDeviceSecureInstallApplicationBundle(device, app_url, options, (AMDeviceInstallCallback)install_callback, 0));
-          CFRelease(extracted_bundle_id_ref);
+          CFStringRef prefer_wifi = no_wifi ? CFSTR("0") : CFSTR("1");
+          CFStringRef values[] = {
+            extracted_bundle_id,
+            CFSTR("1"),
+            CFSTR("1"),
+            CFSTR("1"),
+            CFSTR("Developer"),
+            prefer_wifi,
+            (CFStringRef)app_deltas_url,
+          };
+          CFIndex size = sizeof(keys)/sizeof(CFStringRef);
+          options = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, size, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+
+          check_error(AMDeviceSecureInstallApplicationBundle(device, url, options, (AMDeviceInstallCallback)install_callback, 0));
+          CFRelease(extracted_bundle_id);
+          CFRelease(deltas_path);
+          CFRelease(deltas_relative_url);
+          CFRelease(app_deltas_url);
         }
 
         // close(installFd);
@@ -1797,6 +1814,7 @@ void handle_device(AMDeviceRef device) {
         check_error(AMDeviceDisconnect(device));
 
         CFRelease(path);
+        CFRelease(options);
 
         NSLogOut(@"[100%%] Installed package %@", [NSString stringWithUTF8String:app_path]);
         NSLogJSON(@{@"Event": @"BundleInstall",
