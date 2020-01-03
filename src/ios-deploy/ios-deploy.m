@@ -615,8 +615,14 @@ mach_error_t install_callback(CFDictionaryRef dict, int arg) {
 
     int overall_percent = (percent / 2) + 50;
 
+    // During standard install, the "Status" value contains the actual status,
+    // such as "Copying" or "CreatingStagingDirectory", as well as any
+    // applicable paths. The incremental install version, includes only the
+    // status and a seperate value in "Path" for any applicable paths. This
+    // merges the status and path during incremental installs so the output is
+    // similar between both installation types.
     CFStringRef path = CFDictionaryGetValue(dict, CFSTR("Path"));
-    NSString *status_with_path = path != NULL ?
+    NSString *status_with_path = (path != NULL && app_deltas != NULL) ?
       [NSString stringWithFormat:@"%@ %@", status, path] :
       (__bridge NSString *)status;
 
@@ -1957,7 +1963,7 @@ int main(int argc, char *argv[]) {
     };
     int ch;
 
-    while ((ch = getopt_long(argc, argv, "A:VmcdvunrILeD:R:i:b:a:t:p:1:2:o:l:w:9BWjNs:OE:C", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunrILeD:R:i:b:a:t:p:1:2:o:l:w:9BWjNs:OE:CA:", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
