@@ -72,7 +72,6 @@ const char* output_path = NULL;
 const char* error_path = NULL;
 
 typedef struct am_device * AMDeviceRef;
-typedef void (*AMDeviceInstallCallback)(NSDictionary<NSString *, id> *callbackDictionary, void *device);
 mach_error_t AMDeviceSecureStartService(AMDeviceRef device, CFStringRef service_name, unsigned int *unknown, ServiceConnRef * handle);
 mach_error_t AMDeviceCreateHouseArrestService(AMDeviceRef device, CFStringRef identifier, void * unknown, AFCConnectionRef * handle);
 CFSocketNativeHandle  AMDServiceConnectionGetSocket(ServiceConnRef con);
@@ -1722,44 +1721,29 @@ void handle_device(AMDeviceRef device) {
         check_error(AMDeviceValidatePairing(device));
         check_error(AMDeviceStartSession(device));
 
-
-        // NOTE: the secure version doesn't seem to require us to start the AFC service
-        ServiceConnRef afcFd;
-        check_error(AMDeviceSecureStartService(device, CFSTR("com.apple.afc"), NULL, &afcFd));
-        check_error(AMDeviceStopSession(device));
-        check_error(AMDeviceDisconnect(device));
-
-        bool incremental_install = app_deltas != NULL;
-
         CFDictionaryRef options;
-        if (!incremental_install) {
+        if (app_deltas == NULL) { // standard install
+          // NOTE: the secure version doesn't seem to require us to start the AFC service
+          ServiceConnRef afcFd;
+          check_error(AMDeviceSecureStartService(device, CFSTR("com.apple.afc"), NULL, &afcFd));
+          check_error(AMDeviceStopSession(device));
+          check_error(AMDeviceDisconnect(device));
+
           CFStringRef keys[] = { CFSTR("PackageType") };
           CFStringRef values[] = { CFSTR("Developer") };
           options = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-          //assert(AMDeviceTransferApplication(afcFd, path, NULL, transfer_callback, NULL) == 0);
           check_error(AMDeviceSecureTransferPath(0, device, url, options, transfer_callback, 0));
           close(*afcFd);
-        }
 
-        AMDeviceConnect(device);
-        assert(AMDeviceIsPaired(device));
-        check_error(AMDeviceValidatePairing(device));
-        check_error(AMDeviceStartSession(device));
-
-        if (!incremental_install) {
-          // // NOTE: the secure version doesn't seem to require us to start the installation_proxy service
-          // // Although I can't find it right now, I in some code that the first param of AMDeviceSecureInstallApplication was a "dontStartInstallProxy"
-          // // implying this is done for us by iOS already
-
-          //service_conn_t installFd;
-          //assert(AMDeviceSecureStartService(device, CFSTR("com.apple.mobile.installation_proxy"), NULL, &installFd) == 0);
-
-          //mach_error_t result = AMDeviceInstallApplication(installFd, path, options, install_callback, NULL);
+          AMDeviceConnect(device);
+          assert(AMDeviceIsPaired(device));
+          check_error(AMDeviceValidatePairing(device));
+          check_error(AMDeviceStartSession(device));
           check_error(AMDeviceSecureInstallApplication(0, device, url, options, install_callback, 0));
-        } else {
-          if (app_deltas == NULL) {
-            on_error(@"[ ERROR ] An app delta directory is required for incremental installations.");
-          }
+        } else { // incremental install
+          check_error(AMDeviceStopSession(device));
+          check_error(AMDeviceDisconnect(device));
+
           CFStringRef extracted_bundle_id = NULL;
           CFStringRef extracted_bundle_id_ref = get_bundle_id(url);
           if (bundle_id != NULL) {
@@ -1777,6 +1761,8 @@ void handle_device(AMDeviceRef device) {
           CFURLRef deltas_relative_url =
             CFURLCreateWithFileSystemPath(NULL, deltas_path, kCFURLPOSIXPathStyle, false);
           CFURLRef app_deltas_url = CFURLCopyAbsoluteURL(deltas_relative_url);
+          CFStringRef prefer_wifi = no_wifi ? CFSTR("0") : CFSTR("1");
+
           // These values were determined by inspecting Xcode 11.1 logs with the Console app.
           CFStringRef keys[] = {
             CFSTR("CFBundleIdentifier"),
@@ -1787,8 +1773,6 @@ void handle_device(AMDeviceRef device) {
             CFSTR("PreferWifi"),
             CFSTR("ShadowParentKey"),
           };
-
-          CFStringRef prefer_wifi = no_wifi ? CFSTR("0") : CFSTR("1");
           CFStringRef values[] = {
             extracted_bundle_id,
             CFSTR("1"),
@@ -1798,17 +1782,20 @@ void handle_device(AMDeviceRef device) {
             prefer_wifi,
             (CFStringRef)app_deltas_url,
           };
+
           CFIndex size = sizeof(keys)/sizeof(CFStringRef);
           options = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, size, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 
-          check_error(AMDeviceSecureInstallApplicationBundle(device, url, options, (AMDeviceInstallCallback)install_callback, 0));
+          AMDeviceConnect(device);
+          assert(AMDeviceIsPaired(device));
+          check_error(AMDeviceValidatePairing(device));
+          check_error(AMDeviceStartSession(device));
+          check_error(AMDeviceSecureInstallApplicationBundle(device, url, options, install_callback, 0));
           CFRelease(extracted_bundle_id);
           CFRelease(deltas_path);
           CFRelease(deltas_relative_url);
           CFRelease(app_deltas_url);
         }
-
-        // close(installFd);
 
         check_error(AMDeviceStopSession(device));
         check_error(AMDeviceDisconnect(device));
