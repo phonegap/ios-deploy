@@ -1289,6 +1289,19 @@ AFCConnectionRef start_house_arrest_service(AMDeviceRef device) {
     return conn;
 }
 
+// Uses realpath() to resolve any symlinks in a path. Returns the resolved
+// path or the original path if an error occurs. This allocates memory for the
+// resolved path and the caller is responsible for freeing it.
+char *resolve_path(char *path)
+{
+  char buffer[PATH_MAX];
+  // Use the original path if realpath() fails, otherwise use resolved value.
+  char *resolved_path = realpath(path, buffer) == NULL ? path : buffer;
+  char *new_path = malloc(strlen(resolved_path) + 1);
+  strcpy(new_path, resolved_path);
+  return new_path;
+}
+
 char const* get_filename_from_path(char const* path)
 {
     char const*ptr = path + strlen(path);
@@ -1795,6 +1808,8 @@ void handle_device(AMDeviceRef device) {
           CFRelease(deltas_path);
           CFRelease(deltas_relative_url);
           CFRelease(app_deltas_url);
+          free(app_deltas);
+          app_deltas = NULL;
         }
 
         check_error(AMDeviceStopSession(device));
@@ -2091,7 +2106,7 @@ int main(int argc, char *argv[]) {
             _json_output = true;
             break;
         case 'A':
-            app_deltas = optarg;
+            app_deltas = resolve_path(optarg);
             break;
         default:
             usage(argv[0]);
