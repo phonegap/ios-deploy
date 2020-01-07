@@ -1657,11 +1657,9 @@ void uninstall_app(AMDeviceRef device) {
         } else {
             on_error(@"[ ERROR ] Could not uninstall package with bundle id %@", cf_uninstall_bundle_id);
         }
+        CFRelease(cf_uninstall_bundle_id);
         check_error(AMDeviceStopSession(device));
         check_error(AMDeviceDisconnect(device));
-    }
-    if (cf_uninstall_bundle_id) {
-        CFRelease(cf_uninstall_bundle_id);
     }
 }
 
@@ -1757,11 +1755,9 @@ void handle_device(AMDeviceRef device) {
             } else {
                 on_error(@"[ ERROR ] Could not uninstall package with bundle id %@", cf_uninstall_bundle_id);
             }
+            CFRelease(cf_uninstall_bundle_id);
             check_error(AMDeviceStopSession(device));
             check_error(AMDeviceDisconnect(device));
-        }
-        if (cf_uninstall_bundle_id) {
-            CFRelease(cf_uninstall_bundle_id);
         }
     }
 
