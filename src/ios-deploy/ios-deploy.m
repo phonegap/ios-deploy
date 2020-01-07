@@ -109,6 +109,9 @@ pid_t child = 0;
 const int SIGLLDB = SIGUSR1;
 NSString* tmpUUID;
 struct am_device_notification *notify;
+CFRunLoopSourceRef lldb_socket_runloop;
+CFRunLoopSourceRef server_socket_runloop;
+CFRunLoopSourceRef fdvendor_runloop;
 
 // Error codes we report on different failures, so scripts can distinguish between user app exit
 // codes and our exit codes. For non app errors we use codes in reserved 128-255 range.
@@ -184,12 +187,13 @@ void NSLogJSON(NSDictionary* jsonDict) {
         NSData *data = [NSJSONSerialization dataWithJSONObject:jsonDict
                                                            options:NSJSONWritingPrettyPrinted
                                                              error:&error];
-        assert(data != NULL);
-        NSString *jsonString = @"{\"error\": \"JSON error\"}";
         if (data) {
-            jsonString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+            NSString *jsonString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+            [jsonString writeToFile:@"/dev/stdout" atomically:NO encoding:NSUTF8StringEncoding error:nil];
+            [jsonString release];
+        } else {
+            [@"{\"error\": \"JSON error\"}" writeToFile:@"/dev/stdout" atomically:NO encoding:NSUTF8StringEncoding error:nil];
         }
-        [jsonString writeToFile:@"/dev/stdout" atomically:NO encoding:NSUTF8StringEncoding error:nil];
     }
 }
 
@@ -216,7 +220,7 @@ Boolean path_exists(CFTypeRef path) {
     }
 }
 
-CFStringRef find_path(CFStringRef rootPath, CFStringRef namePattern) {
+CFStringRef copy_find_path(CFStringRef rootPath, CFStringRef namePattern) {
     FILE *fpipe = NULL;
     CFStringRef cf_command;
 
@@ -294,7 +298,7 @@ const char *get_home() {
 
 CFStringRef copy_xcode_path_for_impl(CFStringRef rootPath, CFStringRef subPath, CFStringRef search) {
     CFStringRef searchPath = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/%@"), rootPath, subPath );
-    CFStringRef res = find_path(searchPath, search);
+    CFStringRef res = copy_find_path(searchPath, search);
     CFRelease(searchPath);
     return res;
 }
@@ -385,10 +389,12 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
         CFRelease(device_udid);
     if(device_name != NULL)
         CFRelease(device_name);
+    if(model != NULL)
+        CFRelease(model);
     if(model_name != NULL)
         CFRelease(model_name);
 
-    return full_name;
+    return CFAutorelease(full_name);
 }
 
 NSDictionary* get_device_json_dict(const AMDeviceRef device) {
@@ -431,7 +437,7 @@ NSDictionary* get_device_json_dict(const AMDeviceRef device) {
     
     AMDeviceDisconnect(device);
 
-    return json_dict;
+    return CFAutorelease(json_dict);
 }
 
 CFStringRef get_device_interface_name(const AMDeviceRef device) {
@@ -446,7 +452,7 @@ CFStringRef get_device_interface_name(const AMDeviceRef device) {
     }
 }
 
-CFMutableArrayRef get_device_product_version_parts(AMDeviceRef device) {
+CFMutableArrayRef copy_device_product_version_parts(AMDeviceRef device) {
     CFStringRef version = AMDeviceCopyValue(device, 0, CFSTR("ProductVersion"));
     CFArrayRef parts = CFStringCreateArrayBySeparatingStrings(NULL, version, CFSTR("."));
     CFMutableArrayRef result = CFArrayCreateMutableCopy(NULL, CFArrayGetCount(parts), parts);
@@ -463,7 +469,7 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
     CFStringRef build = AMDeviceCopyValue(device, 0, CFSTR("BuildVersion"));
     CFStringRef deviceClass = AMDeviceCopyValue(device, 0, CFSTR("DeviceClass"));
     CFStringRef path = NULL;
-    CFMutableArrayRef version_parts = get_device_product_version_parts(device);
+    CFMutableArrayRef version_parts = copy_device_product_version_parts(device);
 
     NSLogVerbose(@"Device Class: %@", deviceClass);
     NSLogVerbose(@"build: %@", build);
@@ -483,19 +489,27 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
         
         for( int i = 0; i < 2; ++i ) {
             if (path == NULL) {
-                path = copy_xcode_path_for(deviceClassPath[i], CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@)/%@"), version, build, suffix));
+                CFStringRef search = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@)/%@"), version, build, suffix);
+                path = copy_xcode_path_for(deviceClassPath[i], search);
+                CFRelease(search);
             }
             
             if (path == NULL) {
-                path = copy_xcode_path_for(deviceClassPath[i], CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (*)/%@"), version, suffix));
+                CFStringRef search = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (*)/%@"), version, suffix);
+                path = copy_xcode_path_for(deviceClassPath[i], search);
+                CFRelease(search);
             }
             
             if (path == NULL) {
-                path = copy_xcode_path_for(deviceClassPath[i], CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/%@"), version, suffix));
+                CFStringRef search = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@/%@"), version, suffix);
+                path = copy_xcode_path_for(deviceClassPath[i], search);
+                CFRelease(search);
             }
 
             if (path == NULL) {
-                path = copy_xcode_path_for(deviceClassPath[i], CFStringCreateWithFormat(NULL, NULL, CFSTR("%@.*/%@"), version, suffix));
+                CFStringRef search = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@.*/%@"), version, suffix);
+                path = copy_xcode_path_for(deviceClassPath[i], search);
+                CFRelease(search);
             }
         }
         
@@ -508,7 +522,9 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
     
     for( int i = 0; i < 2; ++i ) {
         if (path == NULL) {
-            path = copy_xcode_path_for(deviceClassPath[i], CFStringCreateWithFormat(NULL, NULL, CFSTR("Latest/%@"), suffix));
+            CFStringRef search = CFStringCreateWithFormat(NULL, NULL, CFSTR("Latest/%@"), suffix);
+            path = copy_xcode_path_for(deviceClassPath[i], search);
+            CFRelease(search);
         }
     }
 
@@ -722,10 +738,12 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     
     CFStringRef exitcode_app_crash_str = CFStringCreateWithFormat(NULL, NULL, CFSTR("%d"), exitcode_app_crash);
     CFStringFindAndReplace(pmodule, CFSTR("{exitcode_app_crash}"), exitcode_app_crash_str, rangeLLDB, 0);
+    CFRelease(exitcode_app_crash_str);
     rangeLLDB.length = CFStringGetLength(pmodule);
     
     CFStringRef detect_deadlock_timeout_str = CFStringCreateWithFormat(NULL, NULL, CFSTR("%d"), _detectDeadlockTimeout);
     CFStringFindAndReplace(pmodule, CFSTR("{detect_deadlock_timeout}"), detect_deadlock_timeout_str, rangeLLDB, 0);
+    CFRelease(detect_deadlock_timeout_str);
     rangeLLDB.length = CFStringGetLength(pmodule);
 
     if (args) {
@@ -763,21 +781,26 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
 
     CFStringRef bundle_identifier = copy_disk_app_identifier(disk_app_url);
     CFURLRef device_app_url = copy_device_app_url(device, bundle_identifier);
+    CFRelease(bundle_identifier);
     CFStringRef device_app_path = CFURLCopyFileSystemPath(device_app_url, kCFURLPOSIXPathStyle);
     CFStringFindAndReplace(cmds, CFSTR("{device_app}"), device_app_path, range, 0);
+    CFRelease(device_app_path);
     range.length = CFStringGetLength(cmds);
 
     CFStringRef disk_app_path = CFURLCopyFileSystemPath(disk_app_url, kCFURLPOSIXPathStyle);
     CFStringFindAndReplace(cmds, CFSTR("{disk_app}"), disk_app_path, range, 0);
+    CFRelease(disk_app_path);
     range.length = CFStringGetLength(cmds);
 
     CFStringRef device_port = CFStringCreateWithFormat(NULL, NULL, CFSTR("%d"), port);
     CFStringFindAndReplace(cmds, CFSTR("{device_port}"), device_port, range, 0);
+    CFRelease(device_port);
     range.length = CFStringGetLength(cmds);
 
     if (output_path) {
         CFStringRef output_path_str = CFStringCreateWithFormat(NULL, NULL, CFSTR("%s"), output_path);
         CFStringFindAndReplace(cmds, CFSTR("{output_path}"), output_path_str, range, 0);
+        CFRelease(output_path_str);
     } else {
         CFStringFindAndReplace(cmds, CFSTR("{output_path}"), CFSTR(""), range, 0);
     }
@@ -785,13 +808,16 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     if (error_path) {
         CFStringRef error_path_str = CFStringCreateWithFormat(NULL, NULL, CFSTR("%s"), error_path);
         CFStringFindAndReplace(cmds, CFSTR("{error_path}"), error_path_str, range, 0);
+        CFRelease(error_path_str);
     } else {
         CFStringFindAndReplace(cmds, CFSTR("{error_path}"), CFSTR(""), range, 0);
     }
     range.length = CFStringGetLength(cmds);
 
     CFURLRef device_container_url = CFURLCreateCopyDeletingLastPathComponent(NULL, device_app_url);
+    CFRelease(device_app_url);
     CFStringRef device_container_path = CFURLCopyFileSystemPath(device_container_url, kCFURLPOSIXPathStyle);
+    CFRelease(device_container_url);
     CFMutableStringRef dcp_noprivate = CFStringCreateMutableCopy(NULL, 0, device_container_path);
     range.length = CFStringGetLength(dcp_noprivate);
     CFStringFindAndReplace(dcp_noprivate, CFSTR("/private/var/"), CFSTR("/var/"), range, 0);
@@ -801,10 +827,15 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
 
     CFURLRef disk_container_url = CFURLCreateCopyDeletingLastPathComponent(NULL, disk_app_url);
     CFStringRef disk_container_path = CFURLCopyFileSystemPath(disk_container_url, kCFURLPOSIXPathStyle);
+    CFRelease(disk_container_url);
     CFStringFindAndReplace(cmds, CFSTR("{disk_container}"), disk_container_path, range, 0);
     range.length = CFStringGetLength(cmds);
     
     CFStringRef search_paths_pairs = copy_modules_search_paths_pairs(symbols_path, disk_container_path, device_container_path, dcp_noprivate);
+    CFRelease(symbols_path);
+    CFRelease(device_container_path);
+    CFRelease(dcp_noprivate);
+    CFRelease(disk_container_path);
     CFStringFindAndReplace(cmds, CFSTR("{modules_search_paths_pairs}"), search_paths_pairs, range, 0);
     range.length = CFStringGetLength(cmds);
     CFRelease(search_paths_pairs);
@@ -831,6 +862,7 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     }
     FILE *out = fopen([prep_cmds_path UTF8String], "w");
     fwrite(CFDataGetBytePtr(cmds_data), CFDataGetLength(cmds_data), 1, out);
+    CFRelease(cmds_data);
     // Write additional commands based on mode we're running in
     const char* extra_cmds;
     if (!interactive)
@@ -847,24 +879,15 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     fwrite(extra_cmds, strlen(extra_cmds), 1, out);
     fclose(out);
 
-    CFDataRef pmodule_data = CFStringCreateExternalRepresentation(NULL, pmodule, kCFStringEncodingUTF8, 0);
 
     out = fopen([python_file_path UTF8String], "w");
+    CFDataRef pmodule_data = CFStringCreateExternalRepresentation(NULL, pmodule, kCFStringEncodingUTF8, 0);
     fwrite(CFDataGetBytePtr(pmodule_data), CFDataGetLength(pmodule_data), 1, out);
+    CFRelease(pmodule_data);
     fclose(out);
 
     CFRelease(cmds);
-    CFRelease(symbols_path);
-    CFRelease(bundle_identifier);
-    CFRelease(device_app_url);
-    CFRelease(device_app_path);
-    CFRelease(disk_app_path);
-    CFRelease(device_container_url);
-    CFRelease(device_container_path);
-    CFRelease(dcp_noprivate);
-    CFRelease(disk_container_url);
-    CFRelease(disk_container_path);
-    CFRelease(cmds_data);
+    CFRelease(pmodule);
 }
 
 CFSocketRef server_socket;
@@ -876,15 +899,13 @@ int kill_ptree(pid_t root, int signum);
 void
 server_callback (CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info)
 {
-    ssize_t res;
-
     if (CFDataGetLength (data) == 0) {
         // close the socket on which we've got end-of-file, the server_socket.
         CFSocketInvalidate(s);
         CFRelease(s);
         return;
     }
-    res = write (CFSocketGetNative (lldb_socket), CFDataGetBytePtr (data), CFDataGetLength (data));
+    write(CFSocketGetNative(lldb_socket), CFDataGetBytePtr(data), CFDataGetLength(data));
 }
 
 void lldb_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info)
@@ -910,7 +931,11 @@ void fdvendor_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataR
     int flag = 1;
     int res = setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(flag));
     assert(res == 0);
-    CFRunLoopAddSource(CFRunLoopGetMain(), CFSocketCreateRunLoopSource(NULL, lldb_socket, 0), kCFRunLoopCommonModes);
+    if (lldb_socket_runloop) {
+        CFRelease(lldb_socket_runloop);
+    }
+    lldb_socket_runloop = CFSocketCreateRunLoopSource(NULL, lldb_socket, 0);
+    CFRunLoopAddSource(CFRunLoopGetMain(), lldb_socket_runloop, kCFRunLoopCommonModes);
 
     CFSocketInvalidate(s);
     CFRelease(s);
@@ -928,7 +953,11 @@ void start_remote_debug_server(AMDeviceRef device) {
      * socket to transfer data.
      */
     server_socket = CFSocketCreateWithNative (NULL, gdbfd, kCFSocketDataCallBack, &server_callback, NULL);
-    CFRunLoopAddSource(CFRunLoopGetMain(), CFSocketCreateRunLoopSource(NULL, server_socket, 0), kCFRunLoopCommonModes);
+    if (server_socket_runloop) {
+        CFRelease(server_socket_runloop);
+    }
+    server_socket_runloop = CFSocketCreateRunLoopSource(NULL, server_socket, 0);
+    CFRunLoopAddSource(CFRunLoopGetMain(), server_socket_runloop, kCFRunLoopCommonModes);
 
     struct sockaddr_in addr4;
     memset(&addr4, 0, sizeof(addr4));
@@ -953,7 +982,11 @@ void start_remote_debug_server(AMDeviceRef device) {
     assert(res == 0);
     port = ntohs(addr4.sin_port);
 
-    CFRunLoopAddSource(CFRunLoopGetMain(), CFSocketCreateRunLoopSource(NULL, fdvendor, 0), kCFRunLoopCommonModes);
+    if (fdvendor_runloop) {
+        CFRelease(fdvendor_runloop);
+    }
+    fdvendor_runloop = CFSocketCreateRunLoopSource(NULL, fdvendor, 0);
+    CFRunLoopAddSource(CFRunLoopGetMain(), fdvendor_runloop, kCFRunLoopCommonModes);
 }
 
 void kill_ptree_inner(pid_t root, int signum, struct kinfo_proc *kp, int kp_len) {
@@ -1149,7 +1182,9 @@ void launch_debugserver_only(AMDeviceRef device, CFURLRef url)
 
     CFStringRef bundle_identifier = copy_disk_app_identifier(url);
     CFURLRef device_app_url = copy_device_app_url(device, bundle_identifier);
+    CFRelease(bundle_identifier);
     CFStringRef device_app_path = CFURLCopyFileSystemPath(device_app_url, kCFURLPOSIXPathStyle);
+    CFRelease(device_app_url);
     CFRelease(url);
 
     NSLogOut(@"debugserver port: %d", port);
@@ -1158,9 +1193,10 @@ void launch_debugserver_only(AMDeviceRef device, CFURLRef url)
                 @"Port": @(port),
                 @"Path": (__bridge NSString *)device_app_path
                 });
+    CFRelease(device_app_path);
 }
 
-CFStringRef get_bundle_id(CFURLRef app_url)
+CFStringRef copy_bundle_id(CFURLRef app_url)
 {
     if (app_url == NULL)
         return NULL;
@@ -1562,7 +1598,6 @@ void upload_single_file(AMDeviceRef device, AFCConnectionRef afc_conn_p, NSStrin
 void upload_dir(AMDeviceRef device, AFCConnectionRef afc_conn_p, NSString* source, NSString* destination)
 {
     check_error(AFCDirectoryCreate(afc_conn_p, [destination fileSystemRepresentation]));
-    destination = [destination copy];
     for (NSString* item in [[NSFileManager defaultManager] contentsOfDirectoryAtPath: source error: nil])
     {
         NSString* sourcePath = [source stringByAppendingPathComponent: item];
@@ -1625,13 +1660,15 @@ void uninstall_app(AMDeviceRef device) {
         check_error(AMDeviceStopSession(device));
         check_error(AMDeviceDisconnect(device));
     }
+    if (cf_uninstall_bundle_id) {
+        CFRelease(cf_uninstall_bundle_id);
+    }
 }
 
 void handle_device(AMDeviceRef device) {
     NSLogVerbose(@"Already found device? %d", found_device);
 
-    CFStringRef found_device_id = AMDeviceCopyDeviceIdentifier(device),
-                device_full_name = get_device_full_name(device),
+    CFStringRef device_full_name = get_device_full_name(device),
                 device_interface_name = get_device_interface_name(device);
 
     if (detect_only) {
@@ -1645,11 +1682,11 @@ void handle_device(AMDeviceRef device) {
         found_device = true;
         return;
     }
+    CFStringRef found_device_id = CFAutorelease(AMDeviceCopyDeviceIdentifier(device));
     if (device_id != NULL) {
-        CFStringRef deviceCFSTR = CFStringCreateWithCString(NULL, device_id, kCFStringEncodingUTF8);
+        CFStringRef deviceCFSTR = CFAutorelease(CFStringCreateWithCString(NULL, device_id, kCFStringEncodingUTF8));
         if (CFStringCompare(deviceCFSTR, found_device_id, kCFCompareCaseInsensitive) == kCFCompareEqualTo) {
             found_device = true;
-            CFRelease(deviceCFSTR);
         } else {
             NSLogOut(@"Skipping %@.", device_full_name);
             return;
@@ -1703,7 +1740,7 @@ void handle_device(AMDeviceRef device) {
         {
             cf_uninstall_bundle_id = CFStringCreateWithCString(NULL, bundle_id, kCFStringEncodingUTF8);
         } else {
-            cf_uninstall_bundle_id = get_bundle_id(url);
+            cf_uninstall_bundle_id = copy_bundle_id(url);
         }
 
         if (cf_uninstall_bundle_id == NULL) {
@@ -1722,6 +1759,9 @@ void handle_device(AMDeviceRef device) {
             }
             check_error(AMDeviceStopSession(device));
             check_error(AMDeviceDisconnect(device));
+        }
+        if (cf_uninstall_bundle_id) {
+            CFRelease(cf_uninstall_bundle_id);
         }
     }
 
@@ -1758,7 +1798,7 @@ void handle_device(AMDeviceRef device) {
           check_error(AMDeviceDisconnect(device));
 
           CFStringRef extracted_bundle_id = NULL;
-          CFStringRef extracted_bundle_id_ref = get_bundle_id(url);
+          CFStringRef extracted_bundle_id_ref = copy_bundle_id(url);
           if (bundle_id != NULL) {
             extracted_bundle_id = CFStringCreateWithCString(NULL, bundle_id, kCFStringEncodingUTF8);
             CFRelease(extracted_bundle_id_ref);
@@ -1815,7 +1855,6 @@ void handle_device(AMDeviceRef device) {
         check_error(AMDeviceStopSession(device));
         check_error(AMDeviceDisconnect(device));
 
-        CFRelease(path);
         CFRelease(options);
 
         NSLogOut(@"[100%%] Installed package %@", [NSString stringWithUTF8String:app_path]);
@@ -1825,6 +1864,7 @@ void handle_device(AMDeviceRef device) {
                     @"Status": @"Complete"
                     });
     }
+    CFRelease(path);
 
     if (!debug)
         exit(0); // no debug phase
