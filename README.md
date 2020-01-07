@@ -56,6 +56,7 @@ python -m py_compile src/scripts/*.py && xcodebuild -target ios-deploy-lib && xc
         -L, --justlaunch             just launch the app and exit lldb
         -v, --verbose                enable verbose output
         -m, --noinstall              directly start debugging without app install (-d not required)
+        -A, --app_deltas             incremental install. must specify a directory to store app deltas to determine what needs to be installed
         -p, --port <number>          port used for device, default: dynamic
         -r, --uninstall              uninstall the app before install (do not use with -m; app cache and data are cleared) 
         -9, --uninstall_only         uninstall the app ONLY. Use only with -1 <bundle_id> 
@@ -91,6 +92,9 @@ The commands below assume that you have an app called `my.app` with bundle id `b
 
     // deploy and launch your app to a connected device, quit when app crashes or exits
     ios-deploy --noninteractive --debug --bundle my.app
+
+    // deploy your app to a connected device using incremental installation
+    ios-deploy --app_deltas /tmp --bundle my.app
 
     // Upload a file to your app's Documents folder
     ios-deploy --bundle_id 'bundle.id' --upload test.txt --to Documents/test.txt
