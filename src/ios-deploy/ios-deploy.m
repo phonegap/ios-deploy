@@ -531,8 +531,15 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
     CFRelease(version_parts);
     CFRelease(build);
     CFRelease(deviceClass);
-    if (path == NULL)
+    if (path == NULL) {
+        unsigned int err = 0xe8000070; // kAMDMobileImageMounterMissingImagePath
+        NSLogJSON(@{
+          @"Event": @"Error",
+          @"Code": @(err),
+          @"Status": [NSString stringWithUTF8String:  get_error_message(err)],
+        });
         on_error([NSString stringWithFormat:@"Unable to locate DeviceSupport directory with suffix '%@'. This probably means you don't have Xcode installed, you will need to launch the app manually and logging output will not be shown!", suffix]);
+    }
     
     time( &endTime );
     NSLogVerbose(@"DeviceSupport directory '%@' was located. It took %.2f seconds", path, difftime(endTime,startTime));
@@ -642,11 +649,19 @@ mach_error_t install_callback(CFDictionaryRef dict, int arg) {
       (__bridge NSString *)status;
 
     NSLogOut(@"[%3d%%] %@", overall_percent, status_with_path);
-    NSLogJSON(@{@"Event": @"BundleInstall",
-                @"OverallPercent": @(overall_percent),
-                @"Percent": @(percent),
-                @"Status": status_with_path
-                });
+
+    NSMutableDictionary *jsonOutput = [@{
+      @"Event": @"BundleInstall",
+      @"OverallPercent": @(overall_percent),
+      @"Percent": @(percent),
+      @"Status": (__bridge NSString *)status
+    } mutableCopy];
+    if (path != NULL) {
+      [jsonOutput setValue:(__bridge NSString *)path forKey:@"Path"];
+    }
+
+    NSLogJSON(jsonOutput);
+    [jsonOutput release];
     return 0;
 }
 
