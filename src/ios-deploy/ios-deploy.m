@@ -192,7 +192,7 @@ void NSLogJSON(NSDictionary* jsonDict) {
             [jsonString writeToFile:@"/dev/stdout" atomically:NO encoding:NSUTF8StringEncoding error:nil];
             [jsonString release];
         } else {
-            [@"{\"error\": \"JSON error\"}" writeToFile:@"/dev/stdout" atomically:NO encoding:NSUTF8StringEncoding error:nil];
+            [@"{\"JSONError\": \"JSON error\"}" writeToFile:@"/dev/stdout" atomically:NO encoding:NSUTF8StringEncoding error:nil];
         }
     }
 }
@@ -532,13 +532,12 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
     CFRelease(build);
     CFRelease(deviceClass);
     if (path == NULL) {
-        unsigned int err = 0xe8000070; // kAMDMobileImageMounterMissingImagePath
+      NSString *msg = [NSString stringWithFormat:@"Unable to locate DeviceSupport directory with suffix '%@'. This probably means you don't have Xcode installed, you will need to launch the app manually and logging output will not be shown!", suffix];
         NSLogJSON(@{
-          @"Event": @"Error",
-          @"Code": @(err),
-          @"Status": [NSString stringWithUTF8String:  get_error_message(err)],
+          @"Event": @"DeviceSupportError",
+          @"Status": msg,
         });
-        on_error([NSString stringWithFormat:@"Unable to locate DeviceSupport directory with suffix '%@'. This probably means you don't have Xcode installed, you will need to launch the app manually and logging output will not be shown!", suffix]);
+        on_error(msg);
     }
     
     time( &endTime );
