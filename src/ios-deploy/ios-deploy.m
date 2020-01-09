@@ -749,7 +749,11 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     CFMutableStringRef pmodule = CFStringCreateMutableCopy(NULL, 0, (CFStringRef)LLDB_FRUITSTRAP_MODULE);
 
     CFRange rangeLLDB = { 0, CFStringGetLength(pmodule) };
-    
+
+    CFStringRef exitcode_error_str = CFStringCreateWithFormat(NULL, NULL, CFSTR("%d"), exitcode_error);
+    CFStringFindAndReplace(pmodule, CFSTR("{exitcode_error}"), exitcode_error_str, rangeLLDB, 0);
+    rangeLLDB.length = CFStringGetLength(pmodule);
+
     CFStringRef exitcode_app_crash_str = CFStringCreateWithFormat(NULL, NULL, CFSTR("%d"), exitcode_app_crash);
     CFStringFindAndReplace(pmodule, CFSTR("{exitcode_app_crash}"), exitcode_app_crash_str, rangeLLDB, 0);
     CFRelease(exitcode_app_crash_str);

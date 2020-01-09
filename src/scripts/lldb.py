@@ -66,9 +66,10 @@ def run_command(debugger, command, result, internal_dict):
     lockedstr = ': Locked'
     if lockedstr in str(startup_error):
        print('\\nDevice Locked\\n')
-       os._exit(254)
     else:
        print(str(startup_error))
+        #force exit to make sure autoexit or safequit don't end up waiting forever
+        os._exit({exitcode_error})
 
 def safequit_command(debugger, command, result, internal_dict):
     process = lldb.target.process
