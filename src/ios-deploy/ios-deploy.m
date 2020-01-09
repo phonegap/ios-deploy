@@ -192,7 +192,7 @@ void NSLogJSON(NSDictionary* jsonDict) {
             [jsonString writeToFile:@"/dev/stdout" atomically:NO encoding:NSUTF8StringEncoding error:nil];
             [jsonString release];
         } else {
-            [@"{\"error\": \"JSON error\"}" writeToFile:@"/dev/stdout" atomically:NO encoding:NSUTF8StringEncoding error:nil];
+            [@"{\"JSONError\": \"JSON error\"}" writeToFile:@"/dev/stdout" atomically:NO encoding:NSUTF8StringEncoding error:nil];
         }
     }
 }
@@ -531,8 +531,14 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
     CFRelease(version_parts);
     CFRelease(build);
     CFRelease(deviceClass);
-    if (path == NULL)
-        on_error([NSString stringWithFormat:@"Unable to locate DeviceSupport directory with suffix '%@'. This probably means you don't have Xcode installed, you will need to launch the app manually and logging output will not be shown!", suffix]);
+    if (path == NULL) {
+      NSString *msg = [NSString stringWithFormat:@"Unable to locate DeviceSupport directory with suffix '%@'. This probably means you don't have Xcode installed, you will need to launch the app manually and logging output will not be shown!", suffix];
+        NSLogJSON(@{
+          @"Event": @"DeviceSupportError",
+          @"Status": msg,
+        });
+        on_error(msg);
+    }
     
     time( &endTime );
     NSLogVerbose(@"DeviceSupport directory '%@' was located. It took %.2f seconds", path, difftime(endTime,startTime));
@@ -642,11 +648,19 @@ mach_error_t install_callback(CFDictionaryRef dict, int arg) {
       (__bridge NSString *)status;
 
     NSLogOut(@"[%3d%%] %@", overall_percent, status_with_path);
-    NSLogJSON(@{@"Event": @"BundleInstall",
-                @"OverallPercent": @(overall_percent),
-                @"Percent": @(percent),
-                @"Status": status_with_path
-                });
+
+    NSMutableDictionary *jsonOutput = [@{
+      @"Event": @"BundleInstall",
+      @"OverallPercent": @(overall_percent),
+      @"Percent": @(percent),
+      @"Status": (__bridge NSString *)status
+    } mutableCopy];
+    if (path != NULL) {
+      [jsonOutput setValue:(__bridge NSString *)path forKey:@"Path"];
+    }
+
+    NSLogJSON(jsonOutput);
+    [jsonOutput release];
     return 0;
 }
 
