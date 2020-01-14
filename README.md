@@ -21,41 +21,24 @@ The 1.x branch has been archived (renamed for now), all development is to be on 
 
 ## Installation
 
-ios-deploy installation is made simple using the node.js package manager.  If you use [Homebrew](https://brew.sh/), install [node.js](https://nodejs.org):
-
+If you have previously installed ios-deploy via `npm`, uninstall it by running:
 ```
-brew install node
-```
-
-Now install ios-deploy with the [node.js](https://nodejs.org) package manager:
-
-```
-npm install -g ios-deploy
+sudo npm uninstall -g ios-deploy
 ```
 
-To build from source:
+Install ios-deploy via [Homebrew](https://brew.sh/) by running:
 
 ```
-xcodebuild
+brew install ios-deploy
 ```
-
-This will build `ios-deploy` into the `build/Release` folder.
 
 ## Testing
 
 Run:
 
 ```
-npm install && npm test
+python -m py_compile src/scripts/*.py && xcodebuild -target ios-deploy-lib && xcodebuild test -scheme ios-deploy-tests
 ```
-
-### OS X 10.11 El Capitan or greater
-
-If you are *not* using a node version manager like [nvm](https://github.com/creationix/nvm) or [n](https://github.com/tj/n), you may have to do either of these three things below when under El Capitan:
-
-1. Add the `--unsafe-perm=true` flag  when installing ios-deploy
-2. Add the `--allow-root` flag  when installing ios-deploy
-3. Ensure the `nobody` user has write access to `/usr/local/lib/node_modules/ios-deploy/ios-deploy`
 
 ## Usage
 
@@ -73,6 +56,7 @@ If you are *not* using a node version manager like [nvm](https://github.com/crea
         -L, --justlaunch             just launch the app and exit lldb
         -v, --verbose                enable verbose output
         -m, --noinstall              directly start debugging without app install (-d not required)
+        -A, --app_deltas             incremental install. must specify a directory to store app deltas to determine what needs to be installed
         -p, --port <number>          port used for device, default: dynamic
         -r, --uninstall              uninstall the app before install (do not use with -m; app cache and data are cleared) 
         -9, --uninstall_only         uninstall the app ONLY. Use only with -1 <bundle_id> 
@@ -108,6 +92,9 @@ The commands below assume that you have an app called `my.app` with bundle id `b
 
     // deploy and launch your app to a connected device, quit when app crashes or exits
     ios-deploy --noninteractive --debug --bundle my.app
+
+    // deploy your app to a connected device using incremental installation
+    ios-deploy --app_deltas /tmp --bundle my.app
 
     // Upload a file to your app's Documents folder
     ios-deploy --bundle_id 'bundle.id' --upload test.txt --to Documents/test.txt
