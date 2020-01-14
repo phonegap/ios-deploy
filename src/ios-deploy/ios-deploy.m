@@ -1673,7 +1673,7 @@ void rmtree(AMDeviceRef device) {
     AFCConnectionRef afc_conn_p = start_house_arrest_service(device);
     assert(afc_conn_p);
     read_dir(afc_conn_p, target_filename, rmtree_callback);
-    AFCConnectionClose(afc_conn_p);
+    check_error(AFCConnectionClose(afc_conn_p));
 }
 
 void uninstall_app(AMDeviceRef device) {
