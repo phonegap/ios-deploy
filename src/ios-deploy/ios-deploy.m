@@ -736,7 +736,9 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
         NSString * string = [NSString stringWithContentsOfFile:[NSString stringWithUTF8String:custom_lldb_prep_cmds_path] encoding:NSUTF8StringEncoding error:nil];
         cmds = CFStringCreateMutableCopy(NULL, 0, (__bridge CFStringRef)string);
     } else {
-        cmds = CFStringCreateMutableCopy(NULL, 0, (__bridge CFStringRef)lldb_prep_cmds);
+        CFStringRef string = CFStringCreateWithCStringNoCopy(NULL, lldb_prep_cmds, kCFStringEncodingUTF8, kCFAllocatorNull);
+        cmds = CFStringCreateMutableCopy(NULL, 0, string);
+        CFRelease(string);
     }
     CFRange range = { 0, CFStringGetLength(cmds) };
 
@@ -885,7 +887,9 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
         extra_cmds = lldb_prep_no_cmds;
     else
         extra_cmds = lldb_prep_interactive_cmds;
-    CFStringFindAndReplace(cmds, CFSTR("{run_commands}"), (__bridge CFStringRef)extra_cmds, range, 0);
+    CFStringRef cf_extra_cmds = CFStringCreateWithCStringNoCopy(NULL, extra_cmds, kCFStringEncodingUTF8, kCFAllocatorNull);
+    CFStringFindAndReplace(cmds, CFSTR("{run_commands}"), cf_extra_cmds, range, 0);
+    CFRelease(cf_extra_cmds);
     range.length = CFStringGetLength(cmds);
 
     // Write commands to temporary file
