@@ -63,13 +63,13 @@ def run_command(debugger, command, result, internal_dict):
     launchInfo.SetEnvironmentEntries(envs_arr, True)
     
     lldb.target.Launch(launchInfo, startup_error)
-    lockedstr = ': Locked'
-    if lockedstr in str(startup_error):
-       print('\\nDevice Locked\\n')
-    else:
-       print(str(startup_error))
-    #force exit to make sure autoexit or safequit don't end up waiting forever
-    os._exit({exitcode_error})
+    if startup_error.Fail():
+        if ': Locked' in str(startup_error):
+            print('\\nDevice Locked\\n')
+        else:
+            print(str(startup_error))
+        #force exit to make sure autoexit or safequit don't end up waiting forever
+        os._exit({exitcode_error})
 
 def safequit_command(debugger, command, result, internal_dict):
     process = lldb.target.process
@@ -165,10 +165,6 @@ def autoexit_command(debugger, command, result, internal_dict):
                 printBacktraceTime = time.time() + 5
         elif state == lldb.eStateStepping or state == lldb.eStateConnected:
             continue
-        elif state == lldb.eStateExited:
-            sys.stdout.write( '\\nPROCESS_EXITED\\n' )
-            CloseOut()
-            os._exit(process.GetExitStatus())
         else:
             if state == lldb.eStateStopped:
                 sys.stdout.write( '\\nPROCESS_STOPPED\\n' )
