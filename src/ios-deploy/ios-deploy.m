@@ -468,7 +468,16 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
     CFStringRef version = NULL;
     CFStringRef build = AMDeviceCopyValue(device, 0, CFSTR("BuildVersion"));
     CFStringRef deviceClass = AMDeviceCopyValue(device, 0, CFSTR("DeviceClass"));
+    CFStringRef deviceModel = AMDeviceCopyValue(device, 0, CFSTR("HardwareModel"));
+    CFStringRef deviceArch = NULL;
     CFStringRef path = NULL;
+
+    device_desc dev;
+    if (deviceModel != NULL) {
+        dev = get_device_desc(deviceModel);
+        deviceArch = dev.arch;
+    }
+
     CFMutableArrayRef version_parts = copy_device_product_version_parts(device);
 
     NSLogVerbose(@"Device Class: %@", deviceClass);
@@ -488,6 +497,12 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
         NSLogVerbose(@"version: %@", version);
         
         for( int i = 0; i < 2; ++i ) {
+            if (path == NULL) {
+                CFStringRef search = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@) %@/%@"), version, build, deviceArch, suffix);
+                path = copy_xcode_path_for(deviceClassPath[i], search);
+                CFRelease(search);
+            }
+
             if (path == NULL) {
                 CFStringRef search = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@)/%@"), version, build, suffix);
                 path = copy_xcode_path_for(deviceClassPath[i], search);
@@ -531,6 +546,9 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
     CFRelease(version_parts);
     CFRelease(build);
     CFRelease(deviceClass);
+    if (deviceModel != NULL) {
+        CFRelease(deviceModel);
+    }
     if (path == NULL) {
       NSString *msg = [NSString stringWithFormat:@"Unable to locate DeviceSupport directory with suffix '%@'. This probably means you don't have Xcode installed, you will need to launch the app manually and logging output will not be shown!", suffix];
         NSLogJSON(@{
