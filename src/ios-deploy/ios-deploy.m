@@ -27,32 +27,32 @@
  * log enable -v -f /Users/vargaz/lldb.log lldb all
  * log enable -v -f /Users/vargaz/gdb-remote.log gdb-remote all
  */
-NSString* LLDB_PREP_CMDS = @
+const char* lldb_prep_cmds = 
     #include "lldb_cmds.h"
 ;
 
-#define LLDB_PREP_NO_CMDS CFSTR("")
+const char* lldb_prep_no_cmds = "";
 
-#define LLDB_PREP_INTERACTIVE_CMDS CFSTR("\
+const char* lldb_prep_interactive_cmds = "\
     run\n\
-")
+";
 
-#define LLDB_PREP_NONINTERACTIVE_JUSTLAUNCH_CMDS CFSTR("\
+const char* lldb_prep_noninteractive_justlaunch_cmds = "\
     run\n\
     safequit\n\
-")
+";
 
-#define LLDB_PREP_NONINTERACTIVE_CMDS CFSTR("\
+const char* lldb_prep_noninteractive_cmds = "\
     run\n\
     autoexit\n\
-")
+";
 
 /*
  * Some things do not seem to work when using the normal commands like process connect/launch, so we invoke them
  * through the python interface. Also, Launch () doesn't seem to work when ran from init_module (), so we add
  * a command which can be used by the user to run it.
  */
-NSString* LLDB_FRUITSTRAP_MODULE = @
+NSString* lldb_fruitstrap_module = @
     #include "lldb.py.h"
 ;
 
@@ -736,7 +736,7 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
         NSString * string = [NSString stringWithContentsOfFile:[NSString stringWithUTF8String:custom_lldb_prep_cmds_path] encoding:NSUTF8StringEncoding error:nil];
         cmds = CFStringCreateMutableCopy(NULL, 0, (__bridge CFStringRef)string);
     } else {
-        cmds = CFStringCreateMutableCopy(NULL, 0, (__bridge CFStringRef)LLDB_PREP_CMDS);
+        cmds = CFStringCreateMutableCopy(NULL, 0, (__bridge CFStringRef)lldb_prep_cmds);
     }
     CFRange range = { 0, CFStringGetLength(cmds) };
 
@@ -748,7 +748,7 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
         NSString * string = [NSString stringWithContentsOfFile:[NSString stringWithUTF8String:custom_lldb_script_path] encoding:NSUTF8StringEncoding error:nil];
         pmodule = CFStringCreateMutableCopy(NULL, 0, (__bridge CFStringRef)string);
     } else {
-        pmodule = CFStringCreateMutableCopy(NULL, 0, (__bridge CFStringRef)LLDB_FRUITSTRAP_MODULE);
+        pmodule = CFStringCreateMutableCopy(NULL, 0, (__bridge CFStringRef)lldb_fruitstrap_module);
     }
 
     CFRange rangeLLDB = { 0, CFStringGetLength(pmodule) };
@@ -872,32 +872,6 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     CFStringFindAndReplace(cmds, CFSTR("{python_file_path}"), (CFStringRef)python_file_path, range, 0);
     range.length = CFStringGetLength(cmds);
 
-    // Add extra commands
-    CFStringRef extra_cmds;
-    if (!interactive) {
-        if (justlaunch) {
-            extra_cmds = LLDB_PREP_NONINTERACTIVE_JUSTLAUNCH_CMDS;
-        } else {
-            extra_cmds = LLDB_PREP_NONINTERACTIVE_CMDS;
-        }
-    } else if (nostart) {
-        extra_cmds = LLDB_PREP_NO_CMDS;
-    } else {
-        extra_cmds = LLDB_PREP_INTERACTIVE_CMDS;
-    }
-    CFStringFindAndReplace(cmds, CFSTR("{run_commands}"), extra_cmds, range, 0);
-    range.length = CFStringGetLength(cmds);
-
-    // Write commands to temporary file
-    CFDataRef cmds_data = CFStringCreateExternalRepresentation(NULL, cmds, kCFStringEncodingUTF8, 0);
-    NSString* prep_cmds_path = [NSString stringWithFormat:PREP_CMDS_PATH, tmpUUID];
-    if(device_id != NULL) {
-        prep_cmds_path = [prep_cmds_path stringByAppendingString:[[NSString stringWithUTF8String:device_id] stringByReplacingOccurrencesOfString:@"-" withString:@"_"]];
-    }
-    FILE *out = fopen([prep_cmds_path UTF8String], "w");
-    fwrite(CFDataGetBytePtr(cmds_data), CFDataGetLength(cmds_data), 1, out);
-
-    CFRelease(cmds_data);
     // Write additional commands based on mode we're running in
     const char* extra_cmds;
     if (!interactive)
@@ -911,7 +885,18 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
         extra_cmds = lldb_prep_no_cmds;
     else
         extra_cmds = lldb_prep_interactive_cmds;
-    fwrite(extra_cmds, strlen(extra_cmds), 1, out);
+    CFStringFindAndReplace(cmds, CFSTR("{run_commands}"), (__bridge CFStringRef)extra_cmds, range, 0);
+    range.length = CFStringGetLength(cmds);
+
+    // Write commands to temporary file
+    CFDataRef cmds_data = CFStringCreateExternalRepresentation(NULL, cmds, kCFStringEncodingUTF8, 0);
+    NSString* prep_cmds_path = [NSString stringWithFormat:PREP_CMDS_PATH, tmpUUID];
+    if(device_id != NULL) {
+        prep_cmds_path = [prep_cmds_path stringByAppendingString:[[NSString stringWithUTF8String:device_id] stringByReplacingOccurrencesOfString:@"-" withString:@"_"]];
+    }
+    FILE *out = fopen([prep_cmds_path UTF8String], "w");
+    fwrite(CFDataGetBytePtr(cmds_data), CFDataGetLength(cmds_data), 1, out);
+    CFRelease(cmds_data);
     fclose(out);
 
     // Write python script to temporary file
