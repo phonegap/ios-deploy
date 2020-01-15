@@ -352,7 +352,9 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
                 device_name = NULL,
                 model_name = NULL,
                 sdk_name = NULL,
-                arch_name = NULL;
+                arch_name = NULL,
+                product_version = NULL,
+                build_version = NULL;
 
     AMDeviceConnect(device);
 
@@ -370,12 +372,16 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
     model_name = dev.name;
     sdk_name = dev.sdk;
     arch_name = dev.arch;
+    product_version = AMDeviceCopyValue(device, 0, CFSTR("ProductVersion"));
+    build_version = AMDeviceCopyValue(device, 0, CFSTR("BuildVersion"));
 
     NSLogVerbose(@"Hardware Model: %@", model);
     NSLogVerbose(@"Device Name: %@", device_name);
     NSLogVerbose(@"Model Name: %@", model_name);
     NSLogVerbose(@"SDK Name: %@", sdk_name);
     NSLogVerbose(@"Architecture Name: %@", arch_name);
+    NSLogVerbose(@"Product Version: %@", product_version);
+    NSLogVerbose(@"Build Version: %@", build_version);
 
     if (device_name != NULL) {
         full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@, %@, %@, %@) a.k.a. '%@'"), device_udid, model, model_name, sdk_name, arch_name, device_name);
@@ -393,6 +399,10 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
         CFRelease(model);
     if(model_name != NULL)
         CFRelease(model_name);
+    if(product_version)
+        CFRelease(product_version);
+    if(build_version)
+        CFRelease(build_version);
 
     return CFAutorelease(full_name);
 }
