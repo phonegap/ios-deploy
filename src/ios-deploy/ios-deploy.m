@@ -1116,7 +1116,7 @@ void launch_debugger(AMDeviceRef device, CFURLRef url) {
         child = getpid();
         pid_t oldfgpid = 0;
         int pfd[2] = {-1, -1};
-        if (interactive && isatty(STDIN_FILENO))
+        if (isatty(STDIN_FILENO))
             // If we are running on a terminal, then we need to bring process to foreground for input
             // to work correctly on lldb's end.
             oldfgpid = bring_process_to_foreground();
