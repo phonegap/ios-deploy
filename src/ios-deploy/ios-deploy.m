@@ -63,7 +63,7 @@ const char* custom_lldb_script_path = NULL;
 
 typedef struct am_device * AMDeviceRef;
 mach_error_t AMDeviceSecureStartService(AMDeviceRef device, CFStringRef service_name, unsigned int *unknown, ServiceConnRef * handle);
-mach_error_t AMDeviceCreateHouseArrestService(AMDeviceRef device, CFStringRef identifier, void * unknown, AFCConnectionRef * handle);
+mach_error_t AMDeviceCreateHouseArrestService(AMDeviceRef device, CFStringRef identifier, CFDictionaryRef options, AFCConnectionRef * handle);
 CFSocketNativeHandle  AMDServiceConnectionGetSocket(ServiceConnRef con);
 int AMDeviceSecureTransferPath(int zero, AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
 int AMDeviceSecureInstallApplication(int zero, AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
@@ -342,7 +342,9 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
                 device_name = NULL,
                 model_name = NULL,
                 sdk_name = NULL,
-                arch_name = NULL;
+                arch_name = NULL,
+                product_version = NULL,
+                build_version = NULL;
 
     AMDeviceConnect(device);
 
@@ -360,12 +362,16 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
     model_name = dev.name;
     sdk_name = dev.sdk;
     arch_name = dev.arch;
+    product_version = AMDeviceCopyValue(device, 0, CFSTR("ProductVersion"));
+    build_version = AMDeviceCopyValue(device, 0, CFSTR("BuildVersion"));
 
     NSLogVerbose(@"Hardware Model: %@", model);
     NSLogVerbose(@"Device Name: %@", device_name);
     NSLogVerbose(@"Model Name: %@", model_name);
     NSLogVerbose(@"SDK Name: %@", sdk_name);
     NSLogVerbose(@"Architecture Name: %@", arch_name);
+    NSLogVerbose(@"Product Version: %@", product_version);
+    NSLogVerbose(@"Build Version: %@", build_version);
 
     if (device_name != NULL) {
         full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@, %@, %@, %@) a.k.a. '%@'"), device_udid, model, model_name, sdk_name, arch_name, device_name);
@@ -383,6 +389,10 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
         CFRelease(model);
     if(model_name != NULL)
         CFRelease(model_name);
+    if(product_version)
+        CFRelease(product_version);
+    if(build_version)
+        CFRelease(build_version);
 
     return CFAutorelease(full_name);
 }
@@ -458,7 +468,16 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
     CFStringRef version = NULL;
     CFStringRef build = AMDeviceCopyValue(device, 0, CFSTR("BuildVersion"));
     CFStringRef deviceClass = AMDeviceCopyValue(device, 0, CFSTR("DeviceClass"));
+    CFStringRef deviceModel = AMDeviceCopyValue(device, 0, CFSTR("HardwareModel"));
+    CFStringRef deviceArch = NULL;
     CFStringRef path = NULL;
+
+    device_desc dev;
+    if (deviceModel != NULL) {
+        dev = get_device_desc(deviceModel);
+        deviceArch = dev.arch;
+    }
+
     CFMutableArrayRef version_parts = copy_device_product_version_parts(device);
 
     NSLogVerbose(@"Device Class: %@", deviceClass);
@@ -478,6 +497,12 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
         NSLogVerbose(@"version: %@", version);
         
         for( int i = 0; i < 2; ++i ) {
+            if (path == NULL) {
+                CFStringRef search = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@) %@/%@"), version, build, deviceArch, suffix);
+                path = copy_xcode_path_for(deviceClassPath[i], search);
+                CFRelease(search);
+            }
+
             if (path == NULL) {
                 CFStringRef search = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@)/%@"), version, build, suffix);
                 path = copy_xcode_path_for(deviceClassPath[i], search);
@@ -521,6 +546,9 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
     CFRelease(version_parts);
     CFRelease(build);
     CFRelease(deviceClass);
+    if (deviceModel != NULL) {
+        CFRelease(deviceModel);
+    }
     if (path == NULL) {
       NSString *msg = [NSString stringWithFormat:@"Unable to locate DeviceSupport directory with suffix '%@'. This probably means you don't have Xcode installed, you will need to launch the app manually and logging output will not be shown!", suffix];
         NSLogJSON(@{
@@ -1065,7 +1093,8 @@ void lldb_finished_handler(int signum)
     _exit(WEXITSTATUS(status));
 }
 
-void bring_process_to_foreground() {
+pid_t bring_process_to_foreground() {
+    pid_t fgpid = tcgetpgrp(STDIN_FILENO);
     if (setpgid(0, 0) == -1)
         perror("setpgid failed");
 
@@ -1073,6 +1102,7 @@ void bring_process_to_foreground() {
     if (tcsetpgrp(STDIN_FILENO, getpid()) == -1)
         perror("tcsetpgrp failed");
     signal(SIGTTOU, SIG_DFL);
+    return fgpid;
 }
 
 void setup_dummy_pipe_on_stdin(int pfd[2]) {
@@ -1122,12 +1152,12 @@ void launch_debugger(AMDeviceRef device, CFURLRef url) {
         signal(SIGHUP, SIG_DFL);
         signal(SIGLLDB, SIG_DFL);
         child = getpid();
-
+        pid_t oldfgpid = 0;
         int pfd[2] = {-1, -1};
         if (isatty(STDIN_FILENO))
             // If we are running on a terminal, then we need to bring process to foreground for input
             // to work correctly on lldb's end.
-            bring_process_to_foreground();
+            oldfgpid = bring_process_to_foreground();
         else
             // If lldb is running in a non terminal environment, then it freaks out spamming "^D" and
             // "quit". It seems this is caused by read() on stdin returning EOF in lldb. To hack around
@@ -1151,6 +1181,10 @@ void launch_debugger(AMDeviceRef device, CFURLRef url) {
 
         // Notify parent we're exiting
         kill(parent, SIGLLDB);
+
+        if (oldfgpid) {
+            tcsetpgrp(STDIN_FILENO, oldfgpid);
+        }
         // Pass lldb exit code
         _exit(WEXITSTATUS(status));
     } else if (pid > 0) {
@@ -1341,8 +1375,18 @@ AFCConnectionRef start_house_arrest_service(AMDeviceRef device) {
     }
 
     CFStringRef cf_bundle_id = CFStringCreateWithCString(NULL, bundle_id, kCFStringEncodingUTF8);
-    if (AMDeviceCreateHouseArrestService(device, cf_bundle_id, 0, &conn) != 0)
-    {
+    CFStringRef keys[1];
+    keys[0] = CFSTR("Command");
+    CFStringRef values[1];
+    values[0] = CFSTR("VendDocuments");
+    CFDictionaryRef command = CFDictionaryCreate(kCFAllocatorDefault,
+                                                 (void*)keys,
+                                                 (void*)values,
+                                                 1,
+                                                 &kCFTypeDictionaryKeyCallBacks,
+                                                 &kCFTypeDictionaryValueCallBacks);
+    if (AMDeviceCreateHouseArrestService(device, cf_bundle_id, 0, &conn) != 0 &&
+        AMDeviceCreateHouseArrestService(device, cf_bundle_id, command, &conn) != 0) {
         on_error(@"Unable to find bundle with id: %@", [NSString stringWithUTF8String:bundle_id]);
     }
 
@@ -1945,6 +1989,14 @@ void device_callback(struct am_device_notification_callback_info *info, void *ar
                 NSLogVerbose(@"Handling device type: %d", AMDeviceGetInterfaceType(info->dev));
                 handle_device(info->dev);
             }
+            break;
+        case ADNCI_MSG_DISCONNECTED:
+        {
+            CFStringRef device_uuid = AMDeviceCopyDeviceIdentifier(info->dev);
+            NSLogOut(@"[....] Disconnected %@", device_uuid);
+            CFRelease(device_uuid);
+            break;
+        }
         default:
             break;
     }
