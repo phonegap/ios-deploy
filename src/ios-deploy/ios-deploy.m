@@ -702,6 +702,21 @@ mach_error_t install_callback(CFDictionaryRef dict, int arg) {
     return 0;
 }
 
+// During standard installation transferring and installation takes place
+// in distinct function that can be passed distinct callbacks. Incremental
+// installation performs both transfer and installation in a single function so
+// use this callback to determine which step is occuring and call the proper
+// callback.
+mach_error_t incremental_install_callback(CFDictionaryRef dict, int arg) {
+  CFStringRef status = CFDictionaryGetValue(dict, CFSTR("Status"));
+  if (CFEqual(status, CFSTR("TransferringPackage")) || CFEqual(status, CFSTR("CopyingFile"))) {
+    return transfer_callback(dict, arg);
+  } else {
+    return install_callback(dict, arg);
+  }
+
+}
+
 CFURLRef copy_device_app_url(AMDeviceRef device, CFStringRef identifier) {
     CFDictionaryRef result = nil;
 
@@ -1942,7 +1957,7 @@ void handle_device(AMDeviceRef device) {
           assert(AMDeviceIsPaired(device));
           check_error(AMDeviceValidatePairing(device));
           check_error(AMDeviceStartSession(device));
-          check_error(AMDeviceSecureInstallApplicationBundle(device, url, options, install_callback, 0));
+          check_error(AMDeviceSecureInstallApplicationBundle(device, url, options, incremental_install_callback, 0));
           CFRelease(extracted_bundle_id);
           CFRelease(deltas_path);
           CFRelease(deltas_relative_url);
