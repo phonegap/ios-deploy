@@ -663,6 +663,16 @@ mach_error_t install_callback(CFDictionaryRef dict, int arg) {
     CFNumberGetValue(CFDictionaryGetValue(dict, CFSTR("PercentComplete")), kCFNumberSInt32Type, &percent);
 
     int overall_percent = (percent / 2) + 50;
+    if (app_deltas != NULL) {
+      // During incremental installation transferring and copying takes place
+      // in the install callback vs during the seperate transfer callback used
+      // in standard installation. To preserve the same progress behavior where
+      // 50% occurs during transfer and 50% occurs during installation, check
+      // for transfer type events here and adjust the overall percent.
+      if (CFEqual(status, CFSTR("TransferringPackage")) || CFEqual(status, CFSTR("CopyingFile"))) {
+        overall_percent = (percent / 2);
+      }
+    }
 
     // During standard install, the "Status" value contains the actual status,
     // such as "Copying" or "CreatingStagingDirectory", as well as any
