@@ -663,42 +663,12 @@ mach_error_t install_callback(CFDictionaryRef dict, int arg) {
     CFNumberGetValue(CFDictionaryGetValue(dict, CFSTR("PercentComplete")), kCFNumberSInt32Type, &percent);
 
     int overall_percent = (percent / 2) + 50;
-    if (app_deltas != NULL) {
-      // During incremental installation transferring and copying takes place
-      // in the install callback vs during the seperate transfer callback used
-      // in standard installation. To preserve the same progress behavior where
-      // 50% occurs during transfer and 50% occurs during installation, check
-      // for transfer type events here and adjust the overall percent.
-      if (CFEqual(status, CFSTR("TransferringPackage")) || CFEqual(status, CFSTR("CopyingFile"))) {
-        overall_percent = (percent / 2);
-      }
-    }
-
-    // During standard install, the "Status" value contains the actual status,
-    // such as "Copying" or "CreatingStagingDirectory", as well as any
-    // applicable paths. The incremental install version, includes only the
-    // status and a seperate value in "Path" for any applicable paths. This
-    // merges the status and path during incremental installs so the output is
-    // similar between both installation types.
-    CFStringRef path = CFDictionaryGetValue(dict, CFSTR("Path"));
-    NSString *status_with_path = (path != NULL && app_deltas != NULL) ?
-      [NSString stringWithFormat:@"%@ %@", status, path] :
-      (__bridge NSString *)status;
-
-    NSLogOut(@"[%3d%%] %@", overall_percent, status_with_path);
-
-    NSMutableDictionary *jsonOutput = [@{
-      @"Event": @"BundleInstall",
-      @"OverallPercent": @(overall_percent),
-      @"Percent": @(percent),
-      @"Status": (__bridge NSString *)status
-    } mutableCopy];
-    if (path != NULL) {
-      [jsonOutput setValue:(__bridge NSString *)path forKey:@"Path"];
-    }
-
-    NSLogJSON(jsonOutput);
-    [jsonOutput release];
+    NSLogOut(@"[%3d%%] %@", overall_percent, status);
+    NSLogJSON(@{@"Event": @"BundleInstall",
+                @"OverallPercent": @(overall_percent),
+                @"Percent": @(percent),
+                @"Status": (__bridge NSString *)status
+                });
     return 0;
 }
 
