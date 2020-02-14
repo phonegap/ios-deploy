@@ -679,12 +679,20 @@ mach_error_t install_callback(CFDictionaryRef dict, int arg) {
 // callback.
 mach_error_t incremental_install_callback(CFDictionaryRef dict, int arg) {
   CFStringRef status = CFDictionaryGetValue(dict, CFSTR("Status"));
-  if (CFEqual(status, CFSTR("TransferringPackage")) || CFEqual(status, CFSTR("CopyingFile"))) {
+  if (CFEqual(status, CFSTR("TransferringPackage"))) {
+    int percent;
+    CFNumberGetValue(CFDictionaryGetValue(dict, CFSTR("PercentComplete")), kCFNumberSInt32Type, &percent);
+    int overall_percent = (percent / 2);
+    NSLogOut(@"[%3d%%] %@", overall_percent, status);
+    NSLogJSON(@{@"Event": @"TransferringPackage",
+                @"OverallPercent": @(overall_percent),
+    });
+    return 0;
+  } else if (CFEqual(status, CFSTR("CopyingFile"))) {
     return transfer_callback(dict, arg);
   } else {
     return install_callback(dict, arg);
   }
-
 }
 
 CFURLRef copy_device_app_url(AMDeviceRef device, CFStringRef identifier) {
