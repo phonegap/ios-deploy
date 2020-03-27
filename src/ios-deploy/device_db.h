@@ -78,10 +78,14 @@ device_desc device_db[] = {
                           ADD_DEVICE("J317xAP", "iPad Pro (11\")",           "iphoneos", "arm64e"),
                           ADD_DEVICE("J318AP",  "iPad Pro (11\")",           "iphoneos", "arm64e"),
                           ADD_DEVICE("J318xAP", "iPad Pro (11\")",           "iphoneos", "arm64e"),
+                          ADD_DEVICE("J417AP", "iPad Pro 2g (11\")",         "iphoneos", "arm64e"),
+                          ADD_DEVICE("J418AP", "iPad Pro 2g (11\")",         "iphoneos", "arm64e"),
                           ADD_DEVICE("J320AP",  "iPad Pro 3G (12.9\")",      "iphoneos", "arm64e"),
                           ADD_DEVICE("J320xAP", "iPad Pro 3G (12.9\")",      "iphoneos", "arm64e"),
                           ADD_DEVICE("J321AP",  "iPad Pro 3G (12.9\")",      "iphoneos", "arm64e"),
                           ADD_DEVICE("J321xAP", "iPad Pro 3G (12.9\")",      "iphoneos", "arm64e"),
+                          ADD_DEVICE("J420AP",  "iPad Pro 4G (12.9\")",      "iphoneos", "arm64e"),
+                          ADD_DEVICE("J421AP",  "iPad Pro 4G (12.9\")",      "iphoneos", "arm64e"),
 
                           // iPad Mini
 

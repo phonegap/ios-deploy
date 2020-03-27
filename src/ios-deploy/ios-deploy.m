@@ -663,33 +663,36 @@ mach_error_t install_callback(CFDictionaryRef dict, int arg) {
     CFNumberGetValue(CFDictionaryGetValue(dict, CFSTR("PercentComplete")), kCFNumberSInt32Type, &percent);
 
     int overall_percent = (percent / 2) + 50;
-
-    // During standard install, the "Status" value contains the actual status,
-    // such as "Copying" or "CreatingStagingDirectory", as well as any
-    // applicable paths. The incremental install version, includes only the
-    // status and a seperate value in "Path" for any applicable paths. This
-    // merges the status and path during incremental installs so the output is
-    // similar between both installation types.
-    CFStringRef path = CFDictionaryGetValue(dict, CFSTR("Path"));
-    NSString *status_with_path = (path != NULL && app_deltas != NULL) ?
-      [NSString stringWithFormat:@"%@ %@", status, path] :
-      (__bridge NSString *)status;
-
-    NSLogOut(@"[%3d%%] %@", overall_percent, status_with_path);
-
-    NSMutableDictionary *jsonOutput = [@{
-      @"Event": @"BundleInstall",
-      @"OverallPercent": @(overall_percent),
-      @"Percent": @(percent),
-      @"Status": (__bridge NSString *)status
-    } mutableCopy];
-    if (path != NULL) {
-      [jsonOutput setValue:(__bridge NSString *)path forKey:@"Path"];
-    }
-
-    NSLogJSON(jsonOutput);
-    [jsonOutput release];
+    NSLogOut(@"[%3d%%] %@", overall_percent, status);
+    NSLogJSON(@{@"Event": @"BundleInstall",
+                @"OverallPercent": @(overall_percent),
+                @"Percent": @(percent),
+                @"Status": (__bridge NSString *)status
+                });
     return 0;
+}
+
+// During standard installation transferring and installation takes place
+// in distinct function that can be passed distinct callbacks. Incremental
+// installation performs both transfer and installation in a single function so
+// use this callback to determine which step is occuring and call the proper
+// callback.
+mach_error_t incremental_install_callback(CFDictionaryRef dict, int arg) {
+  CFStringRef status = CFDictionaryGetValue(dict, CFSTR("Status"));
+  if (CFEqual(status, CFSTR("TransferringPackage"))) {
+    int percent;
+    CFNumberGetValue(CFDictionaryGetValue(dict, CFSTR("PercentComplete")), kCFNumberSInt32Type, &percent);
+    int overall_percent = (percent / 2);
+    NSLogOut(@"[%3d%%] %@", overall_percent, status);
+    NSLogJSON(@{@"Event": @"TransferringPackage",
+                @"OverallPercent": @(overall_percent),
+    });
+    return 0;
+  } else if (CFEqual(status, CFSTR("CopyingFile"))) {
+    return transfer_callback(dict, arg);
+  } else {
+    return install_callback(dict, arg);
+  }
 }
 
 CFURLRef copy_device_app_url(AMDeviceRef device, CFStringRef identifier) {
@@ -1083,7 +1086,8 @@ void lldb_finished_handler(int signum)
     _exit(WEXITSTATUS(status));
 }
 
-void bring_process_to_foreground() {
+pid_t bring_process_to_foreground() {
+    pid_t fgpid = tcgetpgrp(STDIN_FILENO);
     if (setpgid(0, 0) == -1)
         perror("setpgid failed");
 
@@ -1091,6 +1095,7 @@ void bring_process_to_foreground() {
     if (tcsetpgrp(STDIN_FILENO, getpid()) == -1)
         perror("tcsetpgrp failed");
     signal(SIGTTOU, SIG_DFL);
+    return fgpid;
 }
 
 void setup_dummy_pipe_on_stdin(int pfd[2]) {
@@ -1140,12 +1145,12 @@ void launch_debugger(AMDeviceRef device, CFURLRef url) {
         signal(SIGHUP, SIG_DFL);
         signal(SIGLLDB, SIG_DFL);
         child = getpid();
-
+        pid_t oldfgpid = 0;
         int pfd[2] = {-1, -1};
         if (isatty(STDIN_FILENO))
             // If we are running on a terminal, then we need to bring process to foreground for input
             // to work correctly on lldb's end.
-            bring_process_to_foreground();
+            oldfgpid = bring_process_to_foreground();
         else
             // If lldb is running in a non terminal environment, then it freaks out spamming "^D" and
             // "quit". It seems this is caused by read() on stdin returning EOF in lldb. To hack around
@@ -1169,6 +1174,10 @@ void launch_debugger(AMDeviceRef device, CFURLRef url) {
 
         // Notify parent we're exiting
         kill(parent, SIGLLDB);
+
+        if (oldfgpid) {
+            tcsetpgrp(STDIN_FILENO, oldfgpid);
+        }
         // Pass lldb exit code
         _exit(WEXITSTATUS(status));
     } else if (pid > 0) {
@@ -1926,7 +1935,7 @@ void handle_device(AMDeviceRef device) {
           assert(AMDeviceIsPaired(device));
           check_error(AMDeviceValidatePairing(device));
           check_error(AMDeviceStartSession(device));
-          check_error(AMDeviceSecureInstallApplicationBundle(device, url, options, install_callback, 0));
+          check_error(AMDeviceSecureInstallApplicationBundle(device, url, options, incremental_install_callback, 0));
           CFRelease(extracted_bundle_id);
           CFRelease(deltas_path);
           CFRelease(deltas_relative_url);
