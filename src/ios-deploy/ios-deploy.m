@@ -90,6 +90,7 @@ char const*upload_pathname = NULL;
 char *bundle_id = NULL;
 bool interactive = true;
 bool justlaunch = false;
+bool file_system = false;
 char *app_path = NULL;
 char *app_deltas = NULL;
 char *device_id = NULL;
@@ -1353,6 +1354,26 @@ void read_dir(AFCConnectionRef afc_conn_p, const char* dir,
     if (callback) (*callback)(afc_conn_p, dir, READ_DIR_AFTER_DIR);
 }
 
+AFCConnectionRef start_afc_service(AMDeviceRef device) {
+    AMDeviceConnect(device);
+    assert(AMDeviceIsPaired(device));
+    check_error(AMDeviceValidatePairing(device));
+    check_error(AMDeviceStartSession(device));
+
+    AFCConnectionRef conn = NULL;
+    service_conn_t serviceConn;
+
+    if (AMDeviceStartService(device, AMSVC_AFC, &serviceConn, 0) != MDERR_OK) {
+        on_error(@"Unable to start file service!");
+    }
+    if (AFCConnectionOpen(serviceConn, 0, &conn) != MDERR_OK) {
+        on_error(@"Unable to open connection!");
+    }
+
+    check_error(AMDeviceStopSession(device));
+    check_error(AMDeviceDisconnect(device));
+    return conn;
+}
 
 // Used to send files to app-specific sandbox (Documents dir)
 AFCConnectionRef start_house_arrest_service(AMDeviceRef device) {
@@ -1451,7 +1472,12 @@ void list_files_callback(AFCConnectionRef conn, const char *name, read_dir_cb_re
 
 void list_files(AMDeviceRef device)
 {
-    AFCConnectionRef afc_conn_p = start_house_arrest_service(device);
+    AFCConnectionRef afc_conn_p;
+    if (file_system) {
+        afc_conn_p = start_afc_service(device);
+    } else {
+        afc_conn_p = start_house_arrest_service(device);
+    }
     assert(afc_conn_p);
     read_dir(afc_conn_p, list_root?list_root:"/", list_files_callback);
     check_error(AFCConnectionClose(afc_conn_p));
@@ -1576,7 +1602,13 @@ void copy_file_callback(AFCConnectionRef afc_conn_p, const char *name, read_dir_
 
 void download_tree(AMDeviceRef device)
 {
-    AFCConnectionRef afc_conn_p = start_house_arrest_service(device);
+    AFCConnectionRef afc_conn_p;
+    if (file_system) {
+        afc_conn_p = start_afc_service(device);
+    } else {
+        afc_conn_p = start_house_arrest_service(device);
+    }
+    
     assert(afc_conn_p);
     char *dirname = NULL;
 
@@ -1611,7 +1643,12 @@ void upload_single_file(AMDeviceRef device, AFCConnectionRef afc_conn_p, NSStrin
 
 void upload_file(AMDeviceRef device)
 {
-    AFCConnectionRef afc_conn_p = start_house_arrest_service(device);
+    AFCConnectionRef afc_conn_p;
+    if (file_system) {
+        afc_conn_p = start_afc_service(device);
+    } else {
+        afc_conn_p = start_house_arrest_service(device);
+    } 
     assert(afc_conn_p);
 
     if (!target_filename)
@@ -1693,14 +1730,24 @@ void upload_dir(AMDeviceRef device, AFCConnectionRef afc_conn_p, NSString* sourc
 }
 
 void make_directory(AMDeviceRef device) {
-    AFCConnectionRef afc_conn_p = start_house_arrest_service(device);
+    AFCConnectionRef afc_conn_p;
+    if (file_system) {
+        afc_conn_p = start_afc_service(device);
+    } else {
+        afc_conn_p = start_house_arrest_service(device);
+    }
     assert(afc_conn_p);
     check_error(AFCDirectoryCreate(afc_conn_p, target_filename));
     check_error(AFCConnectionClose(afc_conn_p));
 }
 
 void remove_path(AMDeviceRef device) {
-    AFCConnectionRef afc_conn_p = start_house_arrest_service(device);
+    AFCConnectionRef afc_conn_p;
+    if (file_system) {
+        afc_conn_p = start_afc_service(device);
+    } else {
+        afc_conn_p = start_house_arrest_service(device);
+    }
     assert(afc_conn_p);
     check_error(AFCRemovePath(afc_conn_p, target_filename));
     check_error(AFCConnectionClose(afc_conn_p));
@@ -2067,6 +2114,7 @@ void usage(const char* app) {
         @"  -O, --output <file>          write stdout to this file\n"
         @"  -E, --error_output <file>    write stderr to this file\n"
         @"  --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds\n"
+        @"  -f, --file_system            specify file system for mkdir / list / upload / download / rm\n"
         @"  -j, --json                   format output as JSON\n",
         [NSString stringWithUTF8String:app]);
 }
@@ -2121,11 +2169,12 @@ int main(int argc, char *argv[]) {
         { "detect_deadlocks", required_argument, NULL, 1000 },
         { "json", no_argument, NULL, 'j'},
         { "app_deltas", required_argument, NULL, 'A'},
+        { "file_system", no_argument, NULL, 'f'},
         { NULL, 0, NULL, 0 },
     };
     int ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunrILeD:R:X:i:b:a:t:p:1:2:o:l:w:9BWjNs:OE:CA:", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunrILefD:R:X:i:b:a:t:p:1:2:o:l:w:9BWjNs:OE:CA:", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -2254,6 +2303,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'A':
             app_deltas = resolve_path(optarg);
+            break;
+        case 'f':
+            file_system = true;
             break;
         default:
             usage(argv[0]);
