@@ -91,6 +91,7 @@ char *bundle_id = NULL;
 bool interactive = true;
 bool justlaunch = false;
 bool file_system = false;
+bool non_recursively = false;
 char *app_path = NULL;
 char *app_deltas = NULL;
 char *device_id = NULL;
@@ -100,6 +101,7 @@ char *list_root = NULL;
 int _timeout = 0;
 int _detectDeadlockTimeout = 0;
 bool _json_output = false;
+NSMutableArray *_file_meta_info = nil;
 int port = 0;    // 0 means "dynamically assigned"
 CFStringRef last_path = NULL;
 service_conn_t gdbfd;
@@ -1300,15 +1302,53 @@ void read_dir(AFCConnectionRef afc_conn_p, const char* dir,
         // there was a problem reading or opening the file to get info on it, abort
         return;
     }
-
+    
+    long long mtime = -1;
+    long long birthtime = -1;
+    long size = -1;
+    long blocks = -1;
+    long nlink = -1;
+    NSString * ifmt = nil;
     while((AFCKeyValueRead(afc_dict_p,&key,&val) == 0) && key && val) {
         if (strcmp(key,"st_ifmt")==0) {
             not_dir = strcmp(val,"S_IFDIR");
-            break;
+            if (_json_output) {
+                ifmt = [NSString stringWithUTF8String:val];
+            } else {
+                break;
+            }
+        }
+        if (strcmp(key, "st_size") == 0) {
+            size = atol(val);
+        }
+        if (strcmp(key, "st_mtime") == 0) {
+            mtime = atoll(val);
+        }
+        if (strcmp(key, "st_birthtime") == 0) {
+            birthtime = atoll(val);
+        }
+        if (strcmp(key, "st_nlink") == 0) {
+            nlink = atol(val);
+        }
+        if (strcmp(key, "st_blocks") == 0) {
+            nlink = atol(val);
         }
     }
     AFCKeyValueClose(afc_dict_p);
-
+    
+    if (_json_output) {
+        if (_file_meta_info == nil) {
+            _file_meta_info = [[NSMutableArray alloc] init];
+        }
+        [_file_meta_info addObject: @{@"full_path": [NSString stringWithUTF8String:dir],
+                               @"st_ifmt": ifmt,
+                               @"st_nlink": @(nlink),
+                               @"st_size": @(size),
+                               @"st_blocks": @(blocks),
+                               @"st_mtime": @(mtime),
+                               @"st_birthtime": @(birthtime)}];
+    }
+    
     if (not_dir) {
         if (callback) (*callback)(afc_conn_p, dir, READ_DIR_FILE);
         return;
@@ -1342,7 +1382,9 @@ void read_dir(AFCConnectionRef afc_conn_p, const char* dir,
         if (dir_joined[strlen(dir)-1] != '/')
             strcat(dir_joined, "/");
         strcat(dir_joined, dir_ent);
-        read_dir(afc_conn_p, dir_joined, callback);
+        if (!(non_recursively && strcmp(list_root, dir) != 0)) {
+            read_dir(afc_conn_p, dir_joined, callback);
+        }
         free(dir_joined);
     }
 
@@ -1463,6 +1505,10 @@ void* read_file_to_memory(char const * path, size_t* file_size)
 
 void list_files_callback(AFCConnectionRef conn, const char *name, read_dir_cb_reason reason)
 {
+    if (_json_output) {
+        return;
+    }
+    
     if (reason == READ_DIR_FILE) {
         NSLogOut(@"%@", [NSString stringWithUTF8String:name]);
     } else if (reason == READ_DIR_BEFORE_DIR) {
@@ -1480,6 +1526,10 @@ void list_files(AMDeviceRef device)
     }
     assert(afc_conn_p);
     read_dir(afc_conn_p, list_root?list_root:"/", list_files_callback);
+    if (_json_output) {
+        NSLogJSON(@{@"Event": @"FileListed",
+                    @"Files": _file_meta_info});
+    }
     check_error(AFCConnectionClose(afc_conn_p));
 }
 
@@ -2115,6 +2165,7 @@ void usage(const char* app) {
         @"  -E, --error_output <file>    write stderr to this file\n"
         @"  --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds\n"
         @"  -f, --file_system            specify file system for mkdir / list / upload / download / rm\n"
+        @"  -F, --non-recursively        specify non-recursively walk directory\n"
         @"  -j, --json                   format output as JSON\n",
         [NSString stringWithUTF8String:app]);
 }
@@ -2174,7 +2225,7 @@ int main(int argc, char *argv[]) {
     };
     int ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunrILefD:R:X:i:b:a:t:p:1:2:o:l:w:9BWjNs:OE:CA:", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunrILefFD:R:X:i:b:a:t:p:1:2:o:l:w:9BWjNs:OE:CA:", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -2306,6 +2357,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'f':
             file_system = true;
+            break;
+        case 'F':
+            non_recursively = true;
             break;
         default:
             usage(argv[0]);
