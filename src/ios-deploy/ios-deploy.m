@@ -1317,20 +1317,15 @@ void read_dir(AFCConnectionRef afc_conn_p, const char* dir,
             } else {
                 break;
             }
-        }
-        if (strcmp(key, "st_size") == 0) {
+        } else if (strcmp(key, "st_size") == 0) {
             size = atol(val);
-        }
-        if (strcmp(key, "st_mtime") == 0) {
+        } else if (strcmp(key, "st_mtime") == 0) {
             mtime = atoll(val);
-        }
-        if (strcmp(key, "st_birthtime") == 0) {
+        } else if (strcmp(key, "st_birthtime") == 0) {
             birthtime = atoll(val);
-        }
-        if (strcmp(key, "st_nlink") == 0) {
+        } else if (strcmp(key, "st_nlink") == 0) {
             nlink = atol(val);
-        }
-        if (strcmp(key, "st_blocks") == 0) {
+        } else if (strcmp(key, "st_blocks") == 0) {
             nlink = atol(val);
         }
     }
@@ -1341,12 +1336,12 @@ void read_dir(AFCConnectionRef afc_conn_p, const char* dir,
             _file_meta_info = [[NSMutableArray alloc] init];
         }
         [_file_meta_info addObject: @{@"full_path": [NSString stringWithUTF8String:dir],
-                               @"st_ifmt": ifmt,
-                               @"st_nlink": @(nlink),
-                               @"st_size": @(size),
-                               @"st_blocks": @(blocks),
-                               @"st_mtime": @(mtime),
-                               @"st_birthtime": @(birthtime)}];
+                                      @"st_ifmt": ifmt,
+                                      @"st_nlink": @(nlink),
+                                      @"st_size": @(size),
+                                      @"st_blocks": @(blocks),
+                                      @"st_mtime": @(mtime),
+                                      @"st_birthtime": @(birthtime)}];
     }
     
     if (not_dir) {
