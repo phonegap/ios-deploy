@@ -2215,6 +2215,7 @@ int main(int argc, char *argv[]) {
         { "json", no_argument, NULL, 'j'},
         { "app_deltas", required_argument, NULL, 'A'},
         { "file_system", no_argument, NULL, 'f'},
+        { "non-recursively ", no_argument, NULL, 'F'},
         { NULL, 0, NULL, 0 },
     };
     int ch;
