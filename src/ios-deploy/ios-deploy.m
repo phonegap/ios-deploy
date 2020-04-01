@@ -1500,10 +1500,6 @@ void* read_file_to_memory(char const * path, size_t* file_size)
 
 void list_files_callback(AFCConnectionRef conn, const char *name, read_dir_cb_reason reason)
 {
-    if (_json_output) {
-        return;
-    }
-    
     if (reason == READ_DIR_FILE) {
         NSLogOut(@"%@", [NSString stringWithUTF8String:name]);
     } else if (reason == READ_DIR_BEFORE_DIR) {
@@ -1520,11 +1516,14 @@ void list_files(AMDeviceRef device)
         afc_conn_p = start_house_arrest_service(device);
     }
     assert(afc_conn_p);
-    read_dir(afc_conn_p, list_root?list_root:"/", list_files_callback);
     if (_json_output) {
+        read_dir(afc_conn_p, list_root?list_root:"/", NULL);
         NSLogJSON(@{@"Event": @"FileListed",
                     @"Files": _file_meta_info});
+    } else {
+        read_dir(afc_conn_p, list_root?list_root:"/", list_files_callback);
     }
+    
     check_error(AFCConnectionClose(afc_conn_p));
 }
 
