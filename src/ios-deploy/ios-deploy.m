@@ -387,9 +387,9 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
     NSLogVerbose(@"Build Version: %@", build_version);
 
     if (device_name != NULL) {
-        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@, %@, %@, %@) a.k.a. '%@'"), device_udid, model, model_name, sdk_name, arch_name, device_name);
+        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@, %@, %@, %@, %@, %@) a.k.a. '%@'"), device_udid, model, model_name, sdk_name, arch_name, product_version, build_version, device_name);
     } else {
-        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@, %@, %@, %@)"), device_udid, model, model_name, sdk_name, arch_name);
+        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@, %@, %@, %@, %@, %@)"), device_udid, model, model_name, sdk_name, arch_name, product_version, build_version);
     }
 
     AMDeviceDisconnect(device);
