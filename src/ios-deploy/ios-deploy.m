@@ -1580,18 +1580,29 @@ void list_bundle_id(AMDeviceRef device)
     check_error(AMDeviceValidatePairing(device));
     check_error(AMDeviceStartSession(device));
 
-    NSArray *a = [NSArray arrayWithObjects:@"CFBundleIdentifier", nil];
+    NSArray *a = [NSArray arrayWithObjects:
+                  @"CFBundleIdentifier",
+                  @"CFBundleName",
+                  @"CFBundleDisplayName",
+                  @"CFBundleVersion",
+                  @"CFBundleShortVersionString", nil];
     NSDictionary *optionsDict = [NSDictionary dictionaryWithObject:a forKey:@"ReturnAttributes"];
     CFDictionaryRef options = (CFDictionaryRef)optionsDict;
     CFDictionaryRef result = nil;
     check_error(AMDeviceLookupApplications(device, options, &result));
-
+    
     CFIndex count;
     count = CFDictionaryGetCount(result);
     const void *keys[count];
     CFDictionaryGetKeysAndValues(result, keys, NULL);
-    for(int i = 0; i < count; ++i) {
-        NSLogOut(@"%@", (CFStringRef)keys[i]);
+    
+    if (_json_output) {
+        NSLogJSON(@{@"Event": @"BundleIdListed",
+                    @"Apps": (NSDictionary *)result});
+    } else {
+        for(int i = 0; i < count; ++i) {
+            NSLogOut(@"%@", (CFStringRef)keys[i]);
+        }
     }
 
     check_error(AMDeviceStopSession(device));
