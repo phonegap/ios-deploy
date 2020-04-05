@@ -1590,16 +1590,15 @@ void list_bundle_id(AMDeviceRef device)
     CFDictionaryRef options = (CFDictionaryRef)optionsDict;
     CFDictionaryRef result = nil;
     check_error(AMDeviceLookupApplications(device, options, &result));
-    
-    CFIndex count;
-    count = CFDictionaryGetCount(result);
-    const void *keys[count];
-    CFDictionaryGetKeysAndValues(result, keys, NULL);
-    
+
     if (_json_output) {
-        NSLogJSON(@{@"Event": @"BundleIdListed",
+        NSLogJSON(@{@"Event": @"ListBundleId",
                     @"Apps": (NSDictionary *)result});
     } else {
+        CFIndex count;
+        count = CFDictionaryGetCount(result);
+        const void *keys[count];
+        CFDictionaryGetKeysAndValues(result, keys, NULL);
         for(int i = 0; i < count; ++i) {
             NSLogOut(@"%@", (CFStringRef)keys[i]);
         }
