@@ -989,11 +989,42 @@ void fdvendor_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataR
     CFRelease(s);
 }
 
+void connect_and_start_session(AMDeviceRef device) {
+    AMDeviceConnect(device);
+    assert(AMDeviceIsPaired(device));
+    check_error(AMDeviceValidatePairing(device));
+    check_error(AMDeviceStartSession(device));
+}
+
 void start_remote_debug_server(AMDeviceRef device) {
 
-    ServiceConnRef con;
-
-    check_error(AMDeviceSecureStartService(device, CFSTR("com.apple.debugserver"), NULL, &con));
+    ServiceConnRef con = NULL;
+    int start_err = AMDeviceSecureStartService(device, CFSTR("com.apple.debugserver"), NULL, &con);
+    if (start_err != 0)
+    {
+        // After we mount the image, iOS needs to scan the image to register new services.
+        // If we ask to start the service before it is found by ios, we will get 0xe8000022.
+        // In other cases, it's been observed, that device may loose connection here (0xe800002d).
+        // Luckly, we can just restart the connection and continue.
+        // In other cases we just error out.
+        NSLogOut(@"Failed to start debugserver: %x %s", start_err, get_error_message(start_err));
+        switch(start_err)
+        {
+            case 0xe8000022:
+                NSLogOut(@"Waiting for the device to scan mounted image");
+                sleep(1);
+                break;
+            case 0x800002d:
+                NSLogOut(@"Reconnecting to device");
+                // We dont call AMDeviceStopSession as we cannot send any messages anymore
+                check_error(AMDeviceDisconnect(device));
+                connect_and_start_session(device);
+                break;
+            default:
+                check_error(start_err);
+        }
+        check_error(AMDeviceSecureStartService(device, CFSTR("com.apple.debugserver"), NULL, &con));
+    }
     assert(con != NULL);
     gdbfd = AMDServiceConnectionGetSocket(con);
     /*
@@ -1112,10 +1143,7 @@ void setup_lldb(AMDeviceRef device, CFURLRef url) {
     CFStringRef device_full_name = get_device_full_name(device),
     device_interface_name = get_device_interface_name(device);
 
-    AMDeviceConnect(device);
-    assert(AMDeviceIsPaired(device));
-    check_error(AMDeviceValidatePairing(device));
-    check_error(AMDeviceStartSession(device));
+    connect_and_start_session(device);
 
     NSLogOut(@"------ Debug phase ------");
 
@@ -1414,10 +1442,7 @@ AFCConnectionRef start_afc_service(AMDeviceRef device) {
 
 // Used to send files to app-specific sandbox (Documents dir)
 AFCConnectionRef start_house_arrest_service(AMDeviceRef device) {
-    AMDeviceConnect(device);
-    assert(AMDeviceIsPaired(device));
-    check_error(AMDeviceValidatePairing(device));
-    check_error(AMDeviceStartSession(device));
+    connect_and_start_session(device);
 
     AFCConnectionRef conn = NULL;
 
@@ -1575,10 +1600,7 @@ void get_battery_level(AMDeviceRef device)
 
 void list_bundle_id(AMDeviceRef device)
 {
-    AMDeviceConnect(device);
-    assert(AMDeviceIsPaired(device));
-    check_error(AMDeviceValidatePairing(device));
-    check_error(AMDeviceStartSession(device));
+    connect_and_start_session(device);
 
     NSArray *a = [NSArray arrayWithObjects:
                   @"CFBundleIdentifier",
@@ -1841,10 +1863,7 @@ void uninstall_app(AMDeviceRef device) {
     if (cf_uninstall_bundle_id == NULL) {
         on_error(@"Error: Unable to get bundle id from user command or package %@.\nUninstall failed.", [NSString stringWithUTF8String:app_path]);
     } else {
-        AMDeviceConnect(device);
-        assert(AMDeviceIsPaired(device));
-        check_error(AMDeviceValidatePairing(device));
-        check_error(AMDeviceStartSession(device));
+        connect_and_start_session(device);
 
         int code = AMDeviceSecureUninstallApplication(0, device, cf_uninstall_bundle_id, 0, NULL, 0);
         if (code == 0) {
@@ -1941,10 +1960,7 @@ void handle_device(AMDeviceRef device) {
         if (cf_uninstall_bundle_id == NULL) {
             on_error(@"Error: Unable to get bundle id from user command or package %@.\nUninstall failed.", [NSString stringWithUTF8String:app_path]);
         } else {
-            AMDeviceConnect(device);
-            assert(AMDeviceIsPaired(device));
-            check_error(AMDeviceValidatePairing(device));
-            check_error(AMDeviceStartSession(device));
+            connect_and_start_session(device);
 
             int code = AMDeviceSecureUninstallApplication(0, device, cf_uninstall_bundle_id, 0, NULL, 0);
             if (code == 0) {
@@ -1962,10 +1978,7 @@ void handle_device(AMDeviceRef device) {
         NSLogOut(@"------ Install phase ------");
         NSLogOut(@"[  0%%] Found %@ connected through %@, beginning install", device_full_name, device_interface_name);
 
-        AMDeviceConnect(device);
-        assert(AMDeviceIsPaired(device));
-        check_error(AMDeviceValidatePairing(device));
-        check_error(AMDeviceStartSession(device));
+        connect_and_start_session(device);
 
         CFDictionaryRef options;
         if (app_deltas == NULL) { // standard install
@@ -1981,10 +1994,7 @@ void handle_device(AMDeviceRef device) {
           check_error(AMDeviceSecureTransferPath(0, device, url, options, transfer_callback, 0));
           close(*afcFd);
 
-          AMDeviceConnect(device);
-          assert(AMDeviceIsPaired(device));
-          check_error(AMDeviceValidatePairing(device));
-          check_error(AMDeviceStartSession(device));
+          connect_and_start_session(device);
           check_error(AMDeviceSecureInstallApplication(0, device, url, options, install_callback, 0));
         } else { // incremental install
           check_error(AMDeviceStopSession(device));
@@ -2032,10 +2042,7 @@ void handle_device(AMDeviceRef device) {
           CFIndex size = sizeof(keys)/sizeof(CFStringRef);
           options = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, size, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 
-          AMDeviceConnect(device);
-          assert(AMDeviceIsPaired(device));
-          check_error(AMDeviceValidatePairing(device));
-          check_error(AMDeviceStartSession(device));
+          connect_and_start_session(device);
           check_error(AMDeviceSecureInstallApplicationBundle(device, url, options, incremental_install_callback, 0));
           CFRelease(extracted_bundle_id);
           CFRelease(deltas_path);
