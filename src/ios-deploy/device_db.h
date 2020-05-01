@@ -146,6 +146,7 @@ device_desc device_db[] = {
                           ADD_DEVICE("N104AP", "iPhone 11",                  "iphoneos", "arm64e"),
                           ADD_DEVICE("D421AP", "iPhone 11 Pro",              "iphoneos", "arm64e"),
                           ADD_DEVICE("D431AP", "iPhone 11 Pro Max",          "iphoneos", "arm64e"),
+                          ADD_DEVICE("D79AP",  "iPhone SE 2G",               "iphoneos", "arm64e"),
 
                           // Apple TV
 
