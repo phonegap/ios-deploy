@@ -634,7 +634,7 @@ void mount_developer_image(AMDeviceRef device) {
 }
 
 mach_error_t transfer_callback(CFDictionaryRef dict, int arg) {
-    if (CFDictionaryGetValue(dict, CFSTR("Error")) {
+    if (CFDictionaryGetValue(dict, CFSTR("Error"))) {
         return 0;
     }
     int percent;
@@ -664,7 +664,7 @@ mach_error_t transfer_callback(CFDictionaryRef dict, int arg) {
 }
 
 mach_error_t install_callback(CFDictionaryRef dict, int arg) {
-    if (CFDictionaryGetValue(dict, CFSTR("Error")) {
+    if (CFDictionaryGetValue(dict, CFSTR("Error"))) {
         return 0;
     }
     int percent;
@@ -687,7 +687,7 @@ mach_error_t install_callback(CFDictionaryRef dict, int arg) {
 // use this callback to determine which step is occuring and call the proper
 // callback.
 mach_error_t incremental_install_callback(CFDictionaryRef dict, int arg) {
-    if (CFDictionaryGetValue(dict, CFSTR("Error")) {
+    if (CFDictionaryGetValue(dict, CFSTR("Error"))) {
         return 0;
     }
     CFStringRef status = CFDictionaryGetValue(dict, CFSTR("Status"));
