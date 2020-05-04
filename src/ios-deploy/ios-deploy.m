@@ -634,6 +634,9 @@ void mount_developer_image(AMDeviceRef device) {
 }
 
 mach_error_t transfer_callback(CFDictionaryRef dict, int arg) {
+    if (CFDictionaryGetValue(dict, CFSTR("Error")) {
+        return 0;
+    }
     int percent;
     CFStringRef status = CFDictionaryGetValue(dict, CFSTR("Status"));
     CFNumberGetValue(CFDictionaryGetValue(dict, CFSTR("PercentComplete")), kCFNumberSInt32Type, &percent);
@@ -661,6 +664,9 @@ mach_error_t transfer_callback(CFDictionaryRef dict, int arg) {
 }
 
 mach_error_t install_callback(CFDictionaryRef dict, int arg) {
+    if (CFDictionaryGetValue(dict, CFSTR("Error")) {
+        return 0;
+    }
     int percent;
     CFStringRef status = CFDictionaryGetValue(dict, CFSTR("Status"));
     CFNumberGetValue(CFDictionaryGetValue(dict, CFSTR("PercentComplete")), kCFNumberSInt32Type, &percent);
@@ -681,21 +687,24 @@ mach_error_t install_callback(CFDictionaryRef dict, int arg) {
 // use this callback to determine which step is occuring and call the proper
 // callback.
 mach_error_t incremental_install_callback(CFDictionaryRef dict, int arg) {
-  CFStringRef status = CFDictionaryGetValue(dict, CFSTR("Status"));
-  if (CFEqual(status, CFSTR("TransferringPackage"))) {
-    int percent;
-    CFNumberGetValue(CFDictionaryGetValue(dict, CFSTR("PercentComplete")), kCFNumberSInt32Type, &percent);
-    int overall_percent = (percent / 2);
-    NSLogOut(@"[%3d%%] %@", overall_percent, status);
-    NSLogJSON(@{@"Event": @"TransferringPackage",
-                @"OverallPercent": @(overall_percent),
-    });
-    return 0;
-  } else if (CFEqual(status, CFSTR("CopyingFile"))) {
-    return transfer_callback(dict, arg);
-  } else {
-    return install_callback(dict, arg);
-  }
+    if (CFDictionaryGetValue(dict, CFSTR("Error")) {
+        return 0;
+    }
+    CFStringRef status = CFDictionaryGetValue(dict, CFSTR("Status"));
+    if (CFEqual(status, CFSTR("TransferringPackage"))) {
+        int percent;
+        CFNumberGetValue(CFDictionaryGetValue(dict, CFSTR("PercentComplete")), kCFNumberSInt32Type, &percent);
+        int overall_percent = (percent / 2);
+        NSLogOut(@"[%3d%%] %@", overall_percent, status);
+        NSLogJSON(@{@"Event": @"TransferringPackage",
+                    @"OverallPercent": @(overall_percent),
+                    });
+        return 0;
+    } else if (CFEqual(status, CFSTR("CopyingFile"))) {
+        return transfer_callback(dict, arg);
+    } else {
+        return install_callback(dict, arg);
+    }
 }
 
 CFURLRef copy_device_app_url(AMDeviceRef device, CFStringRef identifier) {
