@@ -598,7 +598,9 @@ void mount_developer_image(AMDeviceRef device) {
     FILE* sig = fopen(CFStringGetCStringPtr(sig_path, kCFStringEncodingMacRoman), "rb");
     size_t buf_size = 128;
     void *sig_buf = malloc(buf_size);
-    assert(fread(sig_buf, 1, buf_size, sig) == buf_size);
+    size_t bytes_read = fread(sig_buf, 1, buf_size, sig);
+    assert(bytes_read == buf_size);
+    (void)bytes_read; // Disable unused variable warning.
     fclose(sig);
     CFDataRef sig_data = CFDataCreateWithBytesNoCopy(NULL, sig_buf, buf_size, NULL);
     CFRelease(sig_path);
