@@ -1994,12 +1994,11 @@ void handle_device(AMDeviceRef device) {
         NSLogOut(@"------ Install phase ------");
         NSLogOut(@"[  0%%] Found %@ connected through %@, beginning install", device_full_name, device_interface_name);
 
-        connect_and_start_session(device);
-
         CFDictionaryRef options;
         if (app_deltas == NULL) { // standard install
           // NOTE: the secure version doesn't seem to require us to start the AFC service
           ServiceConnRef afcFd;
+          connect_and_start_session(device);
           check_error(AMDeviceSecureStartService(device, CFSTR("com.apple.afc"), NULL, &afcFd));
           check_error(AMDeviceStopSession(device));
           check_error(AMDeviceDisconnect(device));
@@ -2012,10 +2011,9 @@ void handle_device(AMDeviceRef device) {
 
           connect_and_start_session(device);
           check_error(AMDeviceSecureInstallApplication(0, device, url, options, install_callback, 0));
-        } else { // incremental install
           check_error(AMDeviceStopSession(device));
           check_error(AMDeviceDisconnect(device));
-
+        } else { // incremental install
           CFStringRef extracted_bundle_id = NULL;
           CFStringRef extracted_bundle_id_ref = copy_bundle_id(url);
           if (bundle_id != NULL) {
@@ -2058,7 +2056,8 @@ void handle_device(AMDeviceRef device) {
           CFIndex size = sizeof(keys)/sizeof(CFStringRef);
           options = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, size, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 
-          connect_and_start_session(device);
+          // Incremental installs do not seem to need a session to be started with AMDeviceStartSession() and can instead
+          // cause kAMDSendMessageError when the install takes too long and the session times out.
           check_error(AMDeviceSecureInstallApplicationBundle(device, url, options, incremental_install_callback, 0));
           CFRelease(extracted_bundle_id);
           CFRelease(deltas_path);
@@ -2067,9 +2066,6 @@ void handle_device(AMDeviceRef device) {
           free(app_deltas);
           app_deltas = NULL;
         }
-
-        check_error(AMDeviceStopSession(device));
-        check_error(AMDeviceDisconnect(device));
 
         CFRelease(options);
 
