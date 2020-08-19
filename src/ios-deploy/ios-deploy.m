@@ -2056,8 +2056,7 @@ void handle_device(AMDeviceRef device) {
           CFIndex size = sizeof(keys)/sizeof(CFStringRef);
           options = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, size, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 
-          // Incremental installs do not seem to need a session to be started with AMDeviceStartSession() and can instead
-          // cause kAMDSendMessageError when the install takes too long and the session times out.
+          // Incremental installs should be done without a session started because of timeouts.
           check_error(AMDeviceSecureInstallApplicationBundle(device, url, options, incremental_install_callback, 0));
           CFRelease(extracted_bundle_id);
           CFRelease(deltas_path);
