@@ -75,12 +75,16 @@ typedef struct am_device * AMDeviceRef;
 mach_error_t AMDeviceSecureStartService(AMDeviceRef device, CFStringRef service_name, unsigned int *unknown, ServiceConnRef * handle);
 mach_error_t AMDeviceCreateHouseArrestService(AMDeviceRef device, CFStringRef identifier, CFDictionaryRef options, AFCConnectionRef * handle);
 CFSocketNativeHandle  AMDServiceConnectionGetSocket(ServiceConnRef con);
+int AMDeviceIsAtLeastVersionOnPlatform(AMDeviceRef device, CFDictionaryRef vers);
 int AMDeviceSecureTransferPath(int zero, AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
 int AMDeviceSecureInstallApplication(int zero, AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
 int AMDeviceSecureInstallApplicationBundle(AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
 int AMDeviceMountImage(AMDeviceRef device, CFStringRef image, CFDictionaryRef options, void *callback, int cbarg);
 mach_error_t AMDeviceLookupApplications(AMDeviceRef device, CFDictionaryRef options, CFDictionaryRef *result);
 int AMDeviceGetInterfaceType(AMDeviceRef device);
+
+int AMDServiceConnectionSend(ServiceConnRef con, const void * data, size_t size);
+int AMDServiceConnectionReceive(ServiceConnRef con, void * data, size_t size);
 
 bool found_device = false, debug = false, verbose = false, unbuffered = false, nostart = false, debugserver_only = false, detect_only = false, install = true, uninstall = false, no_wifi = false;
 bool command_only = false;
@@ -104,7 +108,7 @@ bool _json_output = false;
 NSMutableArray *_file_meta_info = nil;
 int port = 0;    // 0 means "dynamically assigned"
 CFStringRef last_path = NULL;
-service_conn_t gdbfd;
+ServiceConnRef dbgServiceConnection = NULL;
 pid_t parent = 0;
 // PID of child process running lldb
 pid_t child = 0;
@@ -959,13 +963,27 @@ int kill_ptree(pid_t root, int signum);
 void
 server_callback (CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info)
 {
-    if (CFDataGetLength (data) == 0) {
+    char buffer[0x4000];
+    int bytesRead = AMDServiceConnectionReceive(dbgServiceConnection, buffer, sizeof(buffer));
+    if (bytesRead == 0)
+    {
         // close the socket on which we've got end-of-file, the server_socket.
         CFSocketInvalidate(s);
         CFRelease(s);
         return;
     }
-    write(CFSocketGetNative(lldb_socket), CFDataGetBytePtr(data), CFDataGetLength(data));
+    write(CFSocketGetNative (lldb_socket), buffer, bytesRead);
+    if (bytesRead == sizeof(buffer))
+    {
+        while (bytesRead > 0)
+        {
+            bytesRead = AMDServiceConnectionReceive(dbgServiceConnection, buffer, sizeof(buffer));
+            if (bytesRead > 0)
+            {
+                write(CFSocketGetNative (lldb_socket), buffer, bytesRead);
+            }
+        }
+    }
 }
 
 void lldb_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info)
@@ -978,7 +996,8 @@ void lldb_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef a
         CFRelease(s);
         return;
     }
-    write (gdbfd, CFDataGetBytePtr (data), CFDataGetLength (data));
+    int sent = AMDServiceConnectionSend(dbgServiceConnection, CFDataGetBytePtr(data),  CFDataGetLength (data));
+    assert (CFDataGetLength (data) == sent);
 }
 
 void fdvendor_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info) {
@@ -1012,8 +1031,17 @@ void connect_and_start_session(AMDeviceRef device) {
 
 void start_remote_debug_server(AMDeviceRef device) {
 
-    ServiceConnRef con = NULL;
-    int start_err = AMDeviceSecureStartService(device, CFSTR("com.apple.debugserver"), NULL, &con);
+    dbgServiceConnection = NULL;
+    CFStringRef serviceName = CFSTR("com.apple.debugserver");
+    CFStringRef keys[] = { CFSTR("MinIPhoneVersion"), CFSTR("MinAppleTVVersion") };
+    CFStringRef values[] = { CFSTR("14.0"), CFSTR("14.0")};
+    CFDictionaryRef version = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, 2, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    if (AMDeviceIsAtLeastVersionOnPlatform(device, version))
+    {
+        serviceName = CFSTR("com.apple.debugserver.DVTSecureSocketProxy");
+    }
+
+    int start_err = AMDeviceSecureStartService(device, serviceName, NULL, &dbgServiceConnection);
     if (start_err != 0)
     {
         // After we mount the image, iOS needs to scan the image to register new services.
@@ -1037,15 +1065,15 @@ void start_remote_debug_server(AMDeviceRef device) {
             default:
                 check_error(start_err);
         }
-        check_error(AMDeviceSecureStartService(device, CFSTR("com.apple.debugserver"), NULL, &con));
+        check_error(AMDeviceSecureStartService(device, serviceName, NULL, &dbgServiceConnection));
     }
-    assert(con != NULL);
-    gdbfd = AMDServiceConnectionGetSocket(con);
+    assert(dbgServiceConnection != NULL);
+
     /*
      * The debugserver connection is through a fd handle, while lldb requires a host/port to connect, so create an intermediate
      * socket to transfer data.
      */
-    server_socket = CFSocketCreateWithNative (NULL, gdbfd, kCFSocketDataCallBack, &server_callback, NULL);
+    server_socket = CFSocketCreateWithNative (NULL, AMDServiceConnectionGetSocket(dbgServiceConnection), kCFSocketDataCallBack, &server_callback, NULL);
     if (server_socket_runloop) {
         CFRelease(server_socket_runloop);
     }
