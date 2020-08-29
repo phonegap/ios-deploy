@@ -963,7 +963,7 @@ int kill_ptree(pid_t root, int signum);
 void
 server_callback (CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info)
 {
-    char buffer[0x4000];
+    char buffer[0x1000];
     int bytesRead = AMDServiceConnectionReceive(dbgServiceConnection, buffer, sizeof(buffer));
     if (bytesRead == 0)
     {
@@ -973,15 +973,12 @@ server_callback (CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef add
         return;
     }
     write(CFSocketGetNative (lldb_socket), buffer, bytesRead);
-    if (bytesRead == sizeof(buffer))
+    while (bytesRead == sizeof(buffer))
     {
-        while (bytesRead > 0)
+        bytesRead = AMDServiceConnectionReceive(dbgServiceConnection, buffer, sizeof(buffer));
+        if (bytesRead > 0)
         {
-            bytesRead = AMDServiceConnectionReceive(dbgServiceConnection, buffer, sizeof(buffer));
-            if (bytesRead > 0)
-            {
-                write(CFSocketGetNative (lldb_socket), buffer, bytesRead);
-            }
+            write(CFSocketGetNative (lldb_socket), buffer, bytesRead);
         }
     }
 }
@@ -1073,7 +1070,7 @@ void start_remote_debug_server(AMDeviceRef device) {
      * The debugserver connection is through a fd handle, while lldb requires a host/port to connect, so create an intermediate
      * socket to transfer data.
      */
-    server_socket = CFSocketCreateWithNative (NULL, AMDServiceConnectionGetSocket(dbgServiceConnection), kCFSocketDataCallBack, &server_callback, NULL);
+    server_socket = CFSocketCreateWithNative (NULL, AMDServiceConnectionGetSocket(dbgServiceConnection), kCFSocketReadCallBack, &server_callback, NULL);
     if (server_socket_runloop) {
         CFRelease(server_socket_runloop);
     }
