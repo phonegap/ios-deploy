@@ -12,6 +12,8 @@
 #include <signal.h>
 #include <getopt.h>
 #include <pwd.h>
+#include <dlfcn.h>
+
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
@@ -75,7 +77,9 @@ typedef struct am_device * AMDeviceRef;
 mach_error_t AMDeviceSecureStartService(AMDeviceRef device, CFStringRef service_name, unsigned int *unknown, ServiceConnRef * handle);
 mach_error_t AMDeviceCreateHouseArrestService(AMDeviceRef device, CFStringRef identifier, CFDictionaryRef options, AFCConnectionRef * handle);
 CFSocketNativeHandle  AMDServiceConnectionGetSocket(ServiceConnRef con);
-int AMDeviceIsAtLeastVersionOnPlatform(AMDeviceRef device, CFDictionaryRef vers);
+void AMDServiceConnectionInvalidate(ServiceConnRef con);
+
+bool AMDeviceIsAtLeastVersionOnPlatform(AMDeviceRef device, CFDictionaryRef vers);
 int AMDeviceSecureTransferPath(int zero, AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
 int AMDeviceSecureInstallApplication(int zero, AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
 int AMDeviceSecureInstallApplicationBundle(AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
@@ -138,6 +142,22 @@ const int exitcode_app_crash = 254;
             on_error(@"Error 0x%x: %@ " #call, err, description);               \
         }                                                                       \
     } while (false);
+
+
+void disable_ssl(ServiceConnRef con)
+{
+    // MobileDevice links with SSL, so function will be available;
+    typedef void (*SSL_free_t)(void*);
+    static SSL_free_t SSL_free = NULL;
+    if (SSL_free == NULL)
+    {
+        SSL_free = (SSL_free_t)dlsym(RTLD_DEFAULT, "SSL_free");
+    }
+
+    SSL_free(con->sslContext);
+    con->sslContext = NULL;
+}
+
 
 void on_error(NSString* format, ...)
 {
@@ -1033,7 +1053,9 @@ void start_remote_debug_server(AMDeviceRef device) {
     CFStringRef keys[] = { CFSTR("MinIPhoneVersion"), CFSTR("MinAppleTVVersion") };
     CFStringRef values[] = { CFSTR("14.0"), CFSTR("14.0")};
     CFDictionaryRef version = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, 2, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    if (AMDeviceIsAtLeastVersionOnPlatform(device, version))
+
+    bool useSecureProxy = AMDeviceIsAtLeastVersionOnPlatform(device, version);
+    if (useSecureProxy)
     {
         serviceName = CFSTR("com.apple.debugserver.DVTSecureSocketProxy");
     }
@@ -1065,6 +1087,11 @@ void start_remote_debug_server(AMDeviceRef device) {
         check_error(AMDeviceSecureStartService(device, serviceName, NULL, &dbgServiceConnection));
     }
     assert(dbgServiceConnection != NULL);
+
+    if (!useSecureProxy)
+    {
+        disable_ssl(dbgServiceConnection);
+    }
 
     /*
      * The debugserver connection is through a fd handle, while lldb requires a host/port to connect, so create an intermediate
@@ -2032,7 +2059,7 @@ void handle_device(AMDeviceRef device) {
           CFStringRef values[] = { CFSTR("Developer") };
           options = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
           check_error(AMDeviceSecureTransferPath(0, device, url, options, transfer_callback, 0));
-          close(*afcFd);
+          AMDServiceConnectionInvalidate(afcFd);
 
           connect_and_start_session(device);
           check_error(AMDeviceSecureInstallApplication(0, device, url, options, install_callback, 0));
