@@ -61,6 +61,8 @@ const char* lldb_prep_noninteractive_cmds = "\
     autoexit\n\
 ";
 
+NSMutableString * custom_commands = nil;
+
 /*
  * Some things do not seem to work when using the normal commands like process connect/launch, so we invoke them
  * through the python interface. Also, Launch () doesn't seem to work when ran from init_module (), so we add
@@ -106,6 +108,7 @@ char *device_id = NULL;
 char *args = NULL;
 char *envs = NULL;
 char *list_root = NULL;
+const char * custom_script_path = NULL;
 int _timeout = 0;
 int _detectDeadlockTimeout = 0;
 bool _json_output = false;
@@ -961,6 +964,11 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     else
         extra_cmds = lldb_prep_interactive_cmds;
     fwrite(extra_cmds, strlen(extra_cmds), 1, out);
+    if (custom_commands != nil)
+    {
+        const char * cmds = [custom_commands UTF8String];
+        fwrite(cmds, 1, strlen(cmds), out);
+    }
     fclose(out);
 
 
@@ -968,6 +976,24 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     CFDataRef pmodule_data = CFStringCreateExternalRepresentation(NULL, pmodule, kCFStringEncodingUTF8, 0);
     fwrite(CFDataGetBytePtr(pmodule_data), CFDataGetLength(pmodule_data), 1, out);
     CFRelease(pmodule_data);
+
+    if (custom_script_path)
+    {
+        FILE * fh = fopen(custom_script_path, "r");
+        if (fh == NULL)
+        {
+            on_error(@"Failed to open %s", custom_script_path);
+        }
+        fwrite("\n", 1, 1, out);
+        char buffer[0x1000];
+        size_t bytesRead;
+        while ((bytesRead = fread(buffer, 1, sizeof(buffer), fh)) > 0)
+        {
+            fwrite(buffer, 1, bytesRead, out);
+        }
+        fclose(fh);
+    }
+
     fclose(out);
 
     CFRelease(cmds);
@@ -2240,7 +2266,9 @@ void usage(const char* app) {
         @"  --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds\n"
         @"  -f, --file_system            specify file system for mkdir / list / upload / download / rm\n"
         @"  -F, --non-recursively        specify non-recursively walk directory\n"
-        @"  -j, --json                   format output as JSON\n",
+        @"  -j, --json                   format output as JSON\n"
+        @"  --custom-script <script>     path to custom python script to execute in lldb\n"
+        @"  --custom-command <command>   specify additional lldb commands to execute\n",
         [NSString stringWithUTF8String:app]);
 }
 
@@ -2296,6 +2324,8 @@ int main(int argc, char *argv[]) {
         { "app_deltas", required_argument, NULL, 'A'},
         { "file_system", no_argument, NULL, 'f'},
         { "non-recursively", no_argument, NULL, 'F'},
+        { "custom-script", required_argument, NULL, 1001},
+        { "custom-command", required_argument, NULL, 1002},
         { NULL, 0, NULL, 0 },
     };
     int ch;
@@ -2435,6 +2465,16 @@ int main(int argc, char *argv[]) {
             break;
         case 'F':
             non_recursively = true;
+            break;
+        case 1001:
+            custom_script_path = optarg;
+            break;
+        case 1002:
+            if (custom_commands == nil)
+            {
+                custom_commands = [[NSMutableString alloc] init];
+            }
+            [custom_commands appendFormat:@"%s\n", optarg];
             break;
         default:
             usage(argv[0]);
