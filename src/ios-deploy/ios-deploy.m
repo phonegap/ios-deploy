@@ -882,7 +882,7 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     range.length = CFStringGetLength(cmds);
 
     if (output_path) {
-        CFStringRef output_path_str = CFStringCreateWithFormat(NULL, NULL, CFSTR("%s"), output_path);
+        CFStringRef output_path_str = CFStringCreateWithCString(NULL, output_path, kCFStringEncodingUTF8);
         CFStringFindAndReplace(cmds, CFSTR("{output_path}"), output_path_str, range, 0);
         CFRelease(output_path_str);
     } else {
@@ -890,7 +890,7 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     }
     range.length = CFStringGetLength(cmds);
     if (error_path) {
-        CFStringRef error_path_str = CFStringCreateWithFormat(NULL, NULL, CFSTR("%s"), error_path);
+        CFStringRef error_path_str = CFStringCreateWithCString(NULL, error_path, kCFStringEncodingUTF8);
         CFStringFindAndReplace(cmds, CFSTR("{error_path}"), error_path_str, range, 0);
         CFRelease(error_path_str);
     } else {
