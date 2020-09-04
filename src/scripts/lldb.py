@@ -126,6 +126,7 @@ def autoexit_command(debugger, command, result, internal_dict):
             stderr = process.GetSTDERR(1024)
 
     def CloseOut():
+        sys.stdout.flush()
         if (out):
             out.close()
         if (err):
