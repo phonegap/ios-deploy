@@ -10,29 +10,8 @@
 		7E70899E1B587F29004D23AA /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E70899D1B587F29004D23AA /* CoreFoundation.framework */; };
 		7E7089A01B58801E004D23AA /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E70899F1B58801E004D23AA /* Foundation.framework */; };
 		7E8E3A861C45D4CE0017F6C1 /* ios_deploy_tests.m in Sources */ = {isa = PBXBuildFile; fileRef = 7E8E3A851C45D4CE0017F6C1 /* ios_deploy_tests.m */; };
-		7E8E3A921C45D5380017F6C1 /* libios_deploy.h in Headers */ = {isa = PBXBuildFile; fileRef = 7E8E3A911C45D5380017F6C1 /* libios_deploy.h */; settings = {ATTRIBUTES = (Public, ); }; };
-		7E8E3A941C45D5380017F6C1 /* libios_deploy.m in Sources */ = {isa = PBXBuildFile; fileRef = 7E8E3A931C45D5380017F6C1 /* libios_deploy.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
-		7E8E3A9B1C45D5970017F6C1 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E70899F1B58801E004D23AA /* Foundation.framework */; };
-		7E8E3A9D1C45D6290017F6C1 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7E70899D1B587F29004D23AA /* CoreFoundation.framework */; };
 		7EDCC3CD1C45DC94002F9851 /* ios-deploy.m in Sources */ = {isa = PBXBuildFile; fileRef = 7E7089991B587DE4004D23AA /* ios-deploy.m */; settings = {COMPILER_FLAGS = "-fno-objc-arc"; }; };
 /* End PBXBuildFile section */
-
-/* Begin PBXContainerItemProxy section */
-		7E8E3A991C45D5850017F6C1 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 7E7089861B587BF3004D23AA /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 7E8E3A8E1C45D5380017F6C1;
-			remoteInfo = "ios-deploy-lib";
-		};
-		7EDCC3CA1C45D933002F9851 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 7E7089861B587BF3004D23AA /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 7E8E3A8E1C45D5380017F6C1;
-			remoteInfo = "ios-deploy-lib";
-		};
-/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		7B28C98C1DC10655009569B6 /* device_db.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = device_db.h; sourceTree = "<group>"; };
@@ -48,9 +27,6 @@
 		7E8E3A831C45D4CE0017F6C1 /* ios-deploy-tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "ios-deploy-tests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7E8E3A851C45D4CE0017F6C1 /* ios_deploy_tests.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ios_deploy_tests.m; sourceTree = "<group>"; };
 		7E8E3A871C45D4CE0017F6C1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		7E8E3A8F1C45D5380017F6C1 /* libios-deploy.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libios-deploy.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		7E8E3A911C45D5380017F6C1 /* libios_deploy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = libios_deploy.h; sourceTree = "<group>"; };
-		7E8E3A931C45D5380017F6C1 /* libios_deploy.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = libios_deploy.m; sourceTree = "<group>"; };
 		7EDCC3CE1C45DFF0002F9851 /* check_reqs.js */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.javascript; path = check_reqs.js; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -68,15 +44,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		7E8E3A8C1C45D5380017F6C1 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				7E8E3A9D1C45D6290017F6C1 /* CoreFoundation.framework in Frameworks */,
-				7E8E3A9B1C45D5970017F6C1 /* Foundation.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -99,7 +66,6 @@
 				7E1C00CE1C3C9A7700D686B5 /* scripts */,
 				7E7089901B587BF3004D23AA /* ios-deploy */,
 				7E8E3A841C45D4CE0017F6C1 /* ios-deploy-tests */,
-				7E8E3A901C45D5380017F6C1 /* ios-deploy-lib */,
 				7E7089A21B588219004D23AA /* Frameworks */,
 				7E70898F1B587BF3004D23AA /* Products */,
 			);
@@ -110,7 +76,6 @@
 			children = (
 				7E70898E1B587BF3004D23AA /* ios-deploy */,
 				7E8E3A831C45D4CE0017F6C1 /* ios-deploy-tests.xctest */,
-				7E8E3A8F1C45D5380017F6C1 /* libios-deploy.a */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -148,28 +113,7 @@
 			path = "src/ios-deploy-tests";
 			sourceTree = "<group>";
 		};
-		7E8E3A901C45D5380017F6C1 /* ios-deploy-lib */ = {
-			isa = PBXGroup;
-			children = (
-				7E8E3A911C45D5380017F6C1 /* libios_deploy.h */,
-				7E8E3A931C45D5380017F6C1 /* libios_deploy.m */,
-			);
-			name = "ios-deploy-lib";
-			path = "src/ios-deploy-lib";
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
-
-/* Begin PBXHeadersBuildPhase section */
-		7E8E3A8D1C45D5380017F6C1 /* Headers */ = {
-			isa = PBXHeadersBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				7E8E3A921C45D5380017F6C1 /* libios_deploy.h in Headers */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
 		7E70898D1B587BF3004D23AA /* ios-deploy */ = {
@@ -184,7 +128,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				7E8E3A9A1C45D5850017F6C1 /* PBXTargetDependency */,
 			);
 			name = "ios-deploy";
 			productName = "ios-deploy";
@@ -204,29 +147,11 @@
 			buildRules = (
 			);
 			dependencies = (
-				7EDCC3CB1C45D933002F9851 /* PBXTargetDependency */,
 			);
 			name = "ios-deploy-tests";
 			productName = "ios-deploy-tests";
 			productReference = 7E8E3A831C45D4CE0017F6C1 /* ios-deploy-tests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
-		};
-		7E8E3A8E1C45D5380017F6C1 /* ios-deploy-lib */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 7E8E3A951C45D5380017F6C1 /* Build configuration list for PBXNativeTarget "ios-deploy-lib" */;
-			buildPhases = (
-				7E8E3A8B1C45D5380017F6C1 /* Sources */,
-				7E8E3A8C1C45D5380017F6C1 /* Frameworks */,
-				7E8E3A8D1C45D5380017F6C1 /* Headers */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = "ios-deploy-lib";
-			productName = "ios-deploy-lib";
-			productReference = 7E8E3A8F1C45D5380017F6C1 /* libios-deploy.a */;
-			productType = "com.apple.product-type.library.static";
 		};
 /* End PBXNativeTarget section */
 
@@ -241,9 +166,6 @@
 						CreatedOnToolsVersion = 6.4;
 					};
 					7E8E3A821C45D4CE0017F6C1 = {
-						CreatedOnToolsVersion = 7.2;
-					};
-					7E8E3A8E1C45D5380017F6C1 = {
 						CreatedOnToolsVersion = 7.2;
 					};
 				};
@@ -263,7 +185,6 @@
 			targets = (
 				7E70898D1B587BF3004D23AA /* ios-deploy */,
 				7E8E3A821C45D4CE0017F6C1 /* ios-deploy-tests */,
-				7E8E3A8E1C45D5380017F6C1 /* ios-deploy-lib */,
 			);
 		};
 /* End PBXProject section */
@@ -342,14 +263,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		7E8E3A8B1C45D5380017F6C1 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				7E8E3A941C45D5380017F6C1 /* libios_deploy.m in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		7EDCC3CC1C45DC89002F9851 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -359,19 +272,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXTargetDependency section */
-		7E8E3A9A1C45D5850017F6C1 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 7E8E3A8E1C45D5380017F6C1 /* ios-deploy-lib */;
-			targetProxy = 7E8E3A991C45D5850017F6C1 /* PBXContainerItemProxy */;
-		};
-		7EDCC3CB1C45D933002F9851 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 7E8E3A8E1C45D5380017F6C1 /* ios-deploy-lib */;
-			targetProxy = 7EDCC3CA1C45D933002F9851 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		7E7089931B587BF3004D23AA /* Debug */ = {
@@ -472,6 +372,7 @@
 				);
 				GCC_C_LANGUAGE_STANDARD = gnu99;
 				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = "NDEBUG=1";
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;
@@ -528,30 +429,6 @@
 			};
 			name = Release;
 		};
-		7E8E3A961C45D5380017F6C1 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_IDENTITY = "-";
-				EXECUTABLE_PREFIX = lib;
-				INSTALL_PATH = "";
-				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				PRODUCT_NAME = "ios-deploy";
-				PUBLIC_HEADERS_FOLDER_PATH = "";
-			};
-			name = Debug;
-		};
-		7E8E3A971C45D5380017F6C1 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_IDENTITY = "-";
-				EXECUTABLE_PREFIX = lib;
-				INSTALL_PATH = "";
-				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				PRODUCT_NAME = "ios-deploy";
-				PUBLIC_HEADERS_FOLDER_PATH = "";
-			};
-			name = Release;
-		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -578,15 +455,6 @@
 			buildConfigurations = (
 				7E8E3A881C45D4CE0017F6C1 /* Debug */,
 				7E8E3A891C45D4CE0017F6C1 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		7E8E3A951C45D5380017F6C1 /* Build configuration list for PBXNativeTarget "ios-deploy-lib" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				7E8E3A961C45D5380017F6C1 /* Debug */,
-				7E8E3A971C45D5380017F6C1 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

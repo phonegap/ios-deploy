@@ -1,6 +1,6 @@
 {
   "name": "ios-deploy",
-  "version": "1.10.0",
+  "version": "1.11.2",
   "os": [
     "darwin"
   ],
@@ -22,7 +22,7 @@
   },
   "scripts": {
     "preinstall": "./src/scripts/check_reqs.js && xcodebuild",
-    "build-test": "npm run pycompile && xcodebuild -target ios-deploy-lib && xcodebuild test -scheme ios-deploy-tests",
+    "build-test": "npm run pycompile && xcodebuild test -scheme ios-deploy-tests",
     "eslint": "eslint src/scripts/*.js",
     "test": "npm run eslint && npm run build-test",
     "pycompile": "python -m py_compile src/scripts/*.py",
