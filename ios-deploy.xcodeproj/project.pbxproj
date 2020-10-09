@@ -237,7 +237,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "echo \"\\\"# AUTO-GENERATED - DO NOT MODIFY\\\"\" > src/ios-deploy/lldb.py.h\nawk '{ print \"\\\"\"$0\"\\\\n\\\"\"}' src/scripts/lldb.py >> src/ios-deploy/lldb.py.h\n";
+			shellScript = "echo \"\\\"# AUTO-GENERATED - DO NOT MODIFY\\\\\\n\\\"\" > src/ios-deploy/lldb.py.h\nawk '{ print \"\\\"\"$0\"\\\\n\\\"\"}' src/scripts/lldb.py >> src/ios-deploy/lldb.py.h\n";
 		};
 		C0CD3D981F59D20100F954DB /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
