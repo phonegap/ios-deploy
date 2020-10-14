@@ -2,7 +2,7 @@
 
 Include the **command line arguments** you used for ios-deploy.
 
-Don't forget to check out the [El Capitan](https://github.com/phonegap/ios-deploy/blob/master/README.md#os-x-1011-el-capitan) section of the [README](https://github.com/phonegap/ios-deploy/blob/master/README.md) before filing this issue.
+Don't forget to check out the [README](https://github.com/phonegap/ios-deploy/blob/master/README.md) before filing this issue.
 
 # Expected behavior
 
@@ -23,6 +23,6 @@ Please run the commands below in your Terminal.app and include it in the issue. 
 - [ ] 4. xcode-select --print-path
 - [ ] 5. gcc --version
 - [ ] 6. lldb --version
-
-
-
+- [ ] **If using NodeJS/npm**
+  - [ ] 7. npm -v
+  - [ ] 8. node -v

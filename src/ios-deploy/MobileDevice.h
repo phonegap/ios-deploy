@@ -65,7 +65,14 @@ typedef unsigned int mach_error_t;
 
 typedef unsigned int afc_error_t;
 typedef unsigned int usbmux_error_t;
-typedef unsigned int service_conn_t;
+
+typedef struct {
+    char unknown[0x10];
+    int sockfd;
+    void * sslContext;
+    // ??
+} service_conn_t;
+
 typedef service_conn_t * ServiceConnRef;
 
 struct am_recovery_device;
