@@ -12,6 +12,8 @@
 #include <signal.h>
 #include <getopt.h>
 #include <pwd.h>
+#include <dlfcn.h>
+
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
@@ -59,6 +61,8 @@ const char* lldb_prep_noninteractive_cmds = "\
     autoexit\n\
 ";
 
+NSMutableString * custom_commands = nil;
+
 /*
  * Some things do not seem to work when using the normal commands like process connect/launch, so we invoke them
  * through the python interface. Also, Launch () doesn't seem to work when ran from init_module (), so we add
@@ -75,12 +79,18 @@ typedef struct am_device * AMDeviceRef;
 mach_error_t AMDeviceSecureStartService(AMDeviceRef device, CFStringRef service_name, unsigned int *unknown, ServiceConnRef * handle);
 mach_error_t AMDeviceCreateHouseArrestService(AMDeviceRef device, CFStringRef identifier, CFDictionaryRef options, AFCConnectionRef * handle);
 CFSocketNativeHandle  AMDServiceConnectionGetSocket(ServiceConnRef con);
+void AMDServiceConnectionInvalidate(ServiceConnRef con);
+
+bool AMDeviceIsAtLeastVersionOnPlatform(AMDeviceRef device, CFDictionaryRef vers);
 int AMDeviceSecureTransferPath(int zero, AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
 int AMDeviceSecureInstallApplication(int zero, AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
 int AMDeviceSecureInstallApplicationBundle(AMDeviceRef device, CFURLRef url, CFDictionaryRef options, void *callback, int cbarg);
 int AMDeviceMountImage(AMDeviceRef device, CFStringRef image, CFDictionaryRef options, void *callback, int cbarg);
 mach_error_t AMDeviceLookupApplications(AMDeviceRef device, CFDictionaryRef options, CFDictionaryRef *result);
 int AMDeviceGetInterfaceType(AMDeviceRef device);
+
+int AMDServiceConnectionSend(ServiceConnRef con, const void * data, size_t size);
+int AMDServiceConnectionReceive(ServiceConnRef con, void * data, size_t size);
 
 bool found_device = false, debug = false, verbose = false, unbuffered = false, nostart = false, debugserver_only = false, detect_only = false, install = true, uninstall = false, no_wifi = false;
 bool command_only = false;
@@ -98,13 +108,14 @@ char *device_id = NULL;
 char *args = NULL;
 char *envs = NULL;
 char *list_root = NULL;
+const char * custom_script_path = NULL;
 int _timeout = 0;
 int _detectDeadlockTimeout = 0;
 bool _json_output = false;
 NSMutableArray *_file_meta_info = nil;
 int port = 0;    // 0 means "dynamically assigned"
 CFStringRef last_path = NULL;
-service_conn_t gdbfd;
+ServiceConnRef dbgServiceConnection = NULL;
 pid_t parent = 0;
 // PID of child process running lldb
 pid_t child = 0;
@@ -134,6 +145,22 @@ const int exitcode_app_crash = 254;
             on_error(@"Error 0x%x: %@ " #call, err, description);               \
         }                                                                       \
     } while (false);
+
+
+void disable_ssl(ServiceConnRef con)
+{
+    // MobileDevice links with SSL, so function will be available;
+    typedef void (*SSL_free_t)(void*);
+    static SSL_free_t SSL_free = NULL;
+    if (SSL_free == NULL)
+    {
+        SSL_free = (SSL_free_t)dlsym(RTLD_DEFAULT, "SSL_free");
+    }
+
+    SSL_free(con->sslContext);
+    con->sslContext = NULL;
+}
+
 
 void on_error(NSString* format, ...)
 {
@@ -858,7 +885,7 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     range.length = CFStringGetLength(cmds);
 
     if (output_path) {
-        CFStringRef output_path_str = CFStringCreateWithFormat(NULL, NULL, CFSTR("%s"), output_path);
+        CFStringRef output_path_str = CFStringCreateWithCString(NULL, output_path, kCFStringEncodingUTF8);
         CFStringFindAndReplace(cmds, CFSTR("{output_path}"), output_path_str, range, 0);
         CFRelease(output_path_str);
     } else {
@@ -866,7 +893,7 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     }
     range.length = CFStringGetLength(cmds);
     if (error_path) {
-        CFStringRef error_path_str = CFStringCreateWithFormat(NULL, NULL, CFSTR("%s"), error_path);
+        CFStringRef error_path_str = CFStringCreateWithCString(NULL, error_path, kCFStringEncodingUTF8);
         CFStringFindAndReplace(cmds, CFSTR("{error_path}"), error_path_str, range, 0);
         CFRelease(error_path_str);
     } else {
@@ -937,6 +964,11 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     else
         extra_cmds = lldb_prep_interactive_cmds;
     fwrite(extra_cmds, strlen(extra_cmds), 1, out);
+    if (custom_commands != nil)
+    {
+        const char * cmds = [custom_commands UTF8String];
+        fwrite(cmds, 1, strlen(cmds), out);
+    }
     fclose(out);
 
 
@@ -944,6 +976,24 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     CFDataRef pmodule_data = CFStringCreateExternalRepresentation(NULL, pmodule, kCFStringEncodingUTF8, 0);
     fwrite(CFDataGetBytePtr(pmodule_data), CFDataGetLength(pmodule_data), 1, out);
     CFRelease(pmodule_data);
+
+    if (custom_script_path)
+    {
+        FILE * fh = fopen(custom_script_path, "r");
+        if (fh == NULL)
+        {
+            on_error(@"Failed to open %s", custom_script_path);
+        }
+        fwrite("\n", 1, 1, out);
+        char buffer[0x1000];
+        size_t bytesRead;
+        while ((bytesRead = fread(buffer, 1, sizeof(buffer), fh)) > 0)
+        {
+            fwrite(buffer, 1, bytesRead, out);
+        }
+        fclose(fh);
+    }
+
     fclose(out);
 
     CFRelease(cmds);
@@ -959,13 +1009,24 @@ int kill_ptree(pid_t root, int signum);
 void
 server_callback (CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info)
 {
-    if (CFDataGetLength (data) == 0) {
+    char buffer[0x1000];
+    int bytesRead = AMDServiceConnectionReceive(dbgServiceConnection, buffer, sizeof(buffer));
+    if (bytesRead == 0)
+    {
         // close the socket on which we've got end-of-file, the server_socket.
         CFSocketInvalidate(s);
         CFRelease(s);
         return;
     }
-    write(CFSocketGetNative(lldb_socket), CFDataGetBytePtr(data), CFDataGetLength(data));
+    write(CFSocketGetNative (lldb_socket), buffer, bytesRead);
+    while (bytesRead == sizeof(buffer))
+    {
+        bytesRead = AMDServiceConnectionReceive(dbgServiceConnection, buffer, sizeof(buffer));
+        if (bytesRead > 0)
+        {
+            write(CFSocketGetNative (lldb_socket), buffer, bytesRead);
+        }
+    }
 }
 
 void lldb_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info)
@@ -978,7 +1039,8 @@ void lldb_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef a
         CFRelease(s);
         return;
     }
-    write (gdbfd, CFDataGetBytePtr (data), CFDataGetLength (data));
+    int sent = AMDServiceConnectionSend(dbgServiceConnection, CFDataGetBytePtr(data),  CFDataGetLength (data));
+    assert (CFDataGetLength (data) == sent);
 }
 
 void fdvendor_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info) {
@@ -1012,8 +1074,19 @@ void connect_and_start_session(AMDeviceRef device) {
 
 void start_remote_debug_server(AMDeviceRef device) {
 
-    ServiceConnRef con = NULL;
-    int start_err = AMDeviceSecureStartService(device, CFSTR("com.apple.debugserver"), NULL, &con);
+    dbgServiceConnection = NULL;
+    CFStringRef serviceName = CFSTR("com.apple.debugserver");
+    CFStringRef keys[] = { CFSTR("MinIPhoneVersion"), CFSTR("MinAppleTVVersion") };
+    CFStringRef values[] = { CFSTR("14.0"), CFSTR("14.0")};
+    CFDictionaryRef version = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, 2, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+
+    bool useSecureProxy = AMDeviceIsAtLeastVersionOnPlatform(device, version);
+    if (useSecureProxy)
+    {
+        serviceName = CFSTR("com.apple.debugserver.DVTSecureSocketProxy");
+    }
+
+    int start_err = AMDeviceSecureStartService(device, serviceName, NULL, &dbgServiceConnection);
     if (start_err != 0)
     {
         // After we mount the image, iOS needs to scan the image to register new services.
@@ -1037,15 +1110,20 @@ void start_remote_debug_server(AMDeviceRef device) {
             default:
                 check_error(start_err);
         }
-        check_error(AMDeviceSecureStartService(device, CFSTR("com.apple.debugserver"), NULL, &con));
+        check_error(AMDeviceSecureStartService(device, serviceName, NULL, &dbgServiceConnection));
     }
-    assert(con != NULL);
-    gdbfd = AMDServiceConnectionGetSocket(con);
+    assert(dbgServiceConnection != NULL);
+
+    if (!useSecureProxy)
+    {
+        disable_ssl(dbgServiceConnection);
+    }
+
     /*
      * The debugserver connection is through a fd handle, while lldb requires a host/port to connect, so create an intermediate
      * socket to transfer data.
      */
-    server_socket = CFSocketCreateWithNative (NULL, gdbfd, kCFSocketDataCallBack, &server_callback, NULL);
+    server_socket = CFSocketCreateWithNative (NULL, AMDServiceConnectionGetSocket(dbgServiceConnection), kCFSocketReadCallBack, &server_callback, NULL);
     if (server_socket_runloop) {
         CFRelease(server_socket_runloop);
     }
@@ -2007,7 +2085,7 @@ void handle_device(AMDeviceRef device) {
           CFStringRef values[] = { CFSTR("Developer") };
           options = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
           check_error(AMDeviceSecureTransferPath(0, device, url, options, transfer_callback, 0));
-          close(*afcFd);
+          AMDServiceConnectionInvalidate(afcFd);
 
           connect_and_start_session(device);
           check_error(AMDeviceSecureInstallApplication(0, device, url, options, install_callback, 0));
@@ -2188,7 +2266,9 @@ void usage(const char* app) {
         @"  --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds\n"
         @"  -f, --file_system            specify file system for mkdir / list / upload / download / rm\n"
         @"  -F, --non-recursively        specify non-recursively walk directory\n"
-        @"  -j, --json                   format output as JSON\n",
+        @"  -j, --json                   format output as JSON\n"
+        @"  --custom-script <script>     path to custom python script to execute in lldb\n"
+        @"  --custom-command <command>   specify additional lldb commands to execute\n",
         [NSString stringWithUTF8String:app]);
 }
 
@@ -2244,6 +2324,8 @@ int main(int argc, char *argv[]) {
         { "app_deltas", required_argument, NULL, 'A'},
         { "file_system", no_argument, NULL, 'f'},
         { "non-recursively", no_argument, NULL, 'F'},
+        { "custom-script", required_argument, NULL, 1001},
+        { "custom-command", required_argument, NULL, 1002},
         { NULL, 0, NULL, 0 },
     };
     int ch;
@@ -2383,6 +2465,16 @@ int main(int argc, char *argv[]) {
             break;
         case 'F':
             non_recursively = true;
+            break;
+        case 1001:
+            custom_script_path = optarg;
+            break;
+        case 1002:
+            if (custom_commands == nil)
+            {
+                custom_commands = [[NSMutableString alloc] init];
+            }
+            [custom_commands appendFormat:@"%s\n", optarg];
             break;
         default:
             usage(argv[0]);
