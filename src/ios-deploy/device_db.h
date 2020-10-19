@@ -63,6 +63,10 @@ device_desc device_db[] = {
                           ADD_DEVICE("J218AP", "iPad Air 3 (Cellular)",      "iphoneos", "arm64e"),
                           ADD_DEVICE("J171AP", "iPad 7",                     "iphoneos", "arm64"),
                           ADD_DEVICE("J172AP", "iPad 7 (Cellular)",          "iphoneos", "arm64"),
+                          ADD_DEVICE("J171aAP", "iPad 8",                    "iphoneos", "arm64e"),
+                          ADD_DEVICE("J172aAP", "iPad 8 (Cellular)",         "iphoneos", "arm64e"),
+                          ADD_DEVICE("J307AP", "iPad Air 4",                 "iphoneos", "arm64e"),
+                          ADD_DEVICE("J308AP", "iPad Air 4 (Cellular)",      "iphoneos", "arm64e"),
 
                           // iPad Pro
 
@@ -147,6 +151,10 @@ device_desc device_db[] = {
                           ADD_DEVICE("D421AP", "iPhone 11 Pro",              "iphoneos", "arm64e"),
                           ADD_DEVICE("D431AP", "iPhone 11 Pro Max",          "iphoneos", "arm64e"),
                           ADD_DEVICE("D79AP",  "iPhone SE 2G",               "iphoneos", "arm64e"),
+                          ADD_DEVICE("D52gAP", "iPhone 12 Mini",             "iphoneos", "arm64e"),
+                          ADD_DEVICE("D53gAP", "iPhone 12",                  "iphoneos", "arm64e"),
+                          ADD_DEVICE("D53pAP", "iPhone 12 Pro",              "iphoneos", "arm64e"),
+                          ADD_DEVICE("D54pAP", "iPhone 12 Pro Max",          "iphoneos", "arm64e"),
 
                           // Apple TV
 
