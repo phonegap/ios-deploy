@@ -1520,7 +1520,7 @@ AFCConnectionRef start_afc_service(AMDeviceRef device) {
     check_error(AMDeviceStartSession(device));
 
     AFCConnectionRef conn = NULL;
-    service_conn_t serviceConn;
+    ServiceConnRef serviceConn = NULL;
 
     if (AMDeviceStartService(device, AMSVC_AFC, &serviceConn, 0) != MDERR_OK) {
         on_error(@"Unable to start file service!");
