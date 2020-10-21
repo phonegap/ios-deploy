@@ -268,7 +268,7 @@ mach_error_t AMDeviceStartSession(struct am_device *device);
  */
 
 mach_error_t AMDeviceStartService(struct am_device *device, CFStringRef 
-    service_name, ServiceConnRef handle, unsigned int *
+    service_name, ServiceConnRef * handle, unsigned int *
     unknown);
 
 mach_error_t AMDeviceStartHouseArrestService(struct am_device *device, CFStringRef identifier, void *unknown, ServiceConnRef handle, unsigned int *what);
@@ -290,7 +290,7 @@ mach_error_t AMDeviceStopSession(struct am_device *device);
  *      MDERR_AFC_OUT_OF_MEMORY if malloc() failed
  */
 
-afc_error_t AFCConnectionOpen(service_conn_t handle, unsigned int io_timeout,
+afc_error_t AFCConnectionOpen(ServiceConnRef handle, unsigned int io_timeout,
     AFCConnectionRef *conn);
 
 /* Pass in a pointer to an afc_device_info structure. It will be filled. */
