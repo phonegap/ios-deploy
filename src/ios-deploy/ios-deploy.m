@@ -412,11 +412,13 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
     NSLogVerbose(@"Architecture Name: %@", arch_name);
     NSLogVerbose(@"Product Version: %@", product_version);
     NSLogVerbose(@"Build Version: %@", build_version);
+    if (build_version == 0)
+        build_version = CFStringCreateWithCString(NULL, "", kCFStringEncodingUTF8);
 
     if (device_name != NULL) {
-        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@, %@, %@, %@) a.k.a. '%@'"), device_udid, model, model_name, sdk_name, arch_name, device_name);
+        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@, %@, %@, %@, %@, %@) a.k.a. '%@'"), device_udid, model, model_name, sdk_name, arch_name, product_version, build_version, device_name);
     } else {
-        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@, %@, %@, %@)"), device_udid, model, model_name, sdk_name, arch_name);
+        full_name = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ (%@, %@, %@, %@, %@, %@)"), device_udid, model, model_name, sdk_name, arch_name, product_version, build_version);
     }
 
     AMDeviceDisconnect(device);
@@ -658,7 +660,16 @@ void mount_developer_image(AMDeviceRef device) {
         
         on_error(@"Unable to mount developer disk image. (%x)", result);
     }
-
+	
+    CFStringRef symbols_path = copy_device_support_path(device, CFSTR("Symbols"));
+    if (symbols_path != NULL)
+    {
+        NSLogOut(@"Symbol Path: %@", symbols_path);
+        NSLogJSON(@{@"Event": @"MountDeveloperImage",
+                    @"SymbolsPath": (__bridge NSString *)symbols_path
+                    });		CFRelease(symbols_path);
+    }
+	
     CFRelease(image_path);
     CFRelease(options);
 }
@@ -2182,8 +2193,9 @@ void device_callback(struct am_device_notification_callback_info *info, void *ar
             break;
         case ADNCI_MSG_DISCONNECTED:
         {
+            CFStringRef device_interface_name = get_device_interface_name(info->dev);
             CFStringRef device_uuid = AMDeviceCopyDeviceIdentifier(info->dev);
-            NSLogOut(@"[....] Disconnected %@", device_uuid);
+            NSLogOut(@"[....] Disconnected %@ from %@.", device_uuid, device_interface_name);
             CFRelease(device_uuid);
             break;
         }

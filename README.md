@@ -44,7 +44,7 @@ brew install ios-deploy
 Run:
 
 ```
-python -m py_compile src/scripts/*.py && xcodebuild -target ios-deploy-lib && xcodebuild test -scheme ios-deploy-tests
+python -m py_compile src/scripts/*.py && xcodebuild -target ios-deploy && xcodebuild test -scheme ios-deploy-tests
 ```
 
 ## Usage
