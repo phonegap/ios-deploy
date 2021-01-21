@@ -98,6 +98,7 @@ char *command = NULL;
 char const*target_filename = NULL;
 char const*upload_pathname = NULL;
 char *bundle_id = NULL;
+char *key = NULL;
 bool interactive = true;
 bool justlaunch = false;
 bool file_system = false;
@@ -1706,13 +1707,17 @@ void get_battery_level(AMDeviceRef device)
 void list_bundle_id(AMDeviceRef device)
 {
     connect_and_start_session(device);
-
-    NSArray *a = [NSArray arrayWithObjects:
-                  @"CFBundleIdentifier",
-                  @"CFBundleName",
-                  @"CFBundleDisplayName",
-                  @"CFBundleVersion",
-                  @"CFBundleShortVersionString", nil];
+    NSMutableArray *a = [NSMutableArray arrayWithObjects:
+                         @"CFBundleIdentifier",
+                         @"CFBundleName",
+                         @"CFBundleDisplayName",
+                         @"CFBundleVersion",
+                         @"CFBundleShortVersionString", nil];
+    if (key) {
+        NSString * ns_all_key = [NSString stringWithUTF8String:key];
+        NSArray * ns_keys = [ns_all_key componentsSeparatedByString:@"&"];
+        [a addObjectsFromArray:ns_keys];
+    }
     NSDictionary *optionsDict = [NSDictionary dictionaryWithObject:a forKey:@"ReturnAttributes"];
     CFDictionaryRef options = (CFDictionaryRef)optionsDict;
     CFDictionaryRef result = nil;
@@ -2279,6 +2284,7 @@ void usage(const char* app) {
         @"  -f, --file_system            specify file system for mkdir / list / upload / download / rm\n"
         @"  -F, --non-recursively        specify non-recursively walk directory\n"
         @"  -j, --json                   format output as JSON\n"
+        @"  -k, --key                    keys for the properties of the app installed. Joined by '&' and used only with -B <list_bundle_id> \n"
         @"  --custom-script <script>     path to custom python script to execute in lldb\n"
         @"  --custom-command <command>   specify additional lldb commands to execute\n",
         [NSString stringWithUTF8String:app]);
@@ -2336,13 +2342,14 @@ int main(int argc, char *argv[]) {
         { "app_deltas", required_argument, NULL, 'A'},
         { "file_system", no_argument, NULL, 'f'},
         { "non-recursively", no_argument, NULL, 'F'},
+        { "key", optional_argument, NULL, 'k' },
         { "custom-script", required_argument, NULL, 1001},
         { "custom-command", required_argument, NULL, 1002},
         { NULL, 0, NULL, 0 },
     };
     int ch;
 
-    while ((ch = getopt_long(argc, argv, "VmcdvunrILefFD:R:X:i:b:a:t:p:1:2:o:l:w:9BWjNs:OE:CA:", longopts, NULL)) != -1)
+    while ((ch = getopt_long(argc, argv, "VmcdvunrILefFD:R:X:i:b:a:t:p:1:2:o:l:w:9BWjNs:OE:CA:k:", longopts, NULL)) != -1)
     {
         switch (ch) {
         case 'm':
@@ -2487,6 +2494,9 @@ int main(int argc, char *argv[]) {
                 custom_commands = [[NSMutableString alloc] init];
             }
             [custom_commands appendFormat:@"%s\n", optarg];
+            break;
+        case 'k':
+            key = optarg;
             break;
         default:
             usage(argv[0]);
