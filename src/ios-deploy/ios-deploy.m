@@ -2510,7 +2510,7 @@ int main(int argc, char *argv[]) {
 
     if (!app_path && !detect_only && !command_only) {
         usage(argv[0]);
-        on_error(@"One of -[b|c|o|l|w|D|R|X|e|B|C|9|] is required to proceed!");
+        on_error(@"One of -[b|c|o|l|w|D|R|X|e|B|C|9] is required to proceed!");
     }
 
     if (unbuffered) {
