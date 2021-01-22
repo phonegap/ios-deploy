@@ -1714,8 +1714,7 @@ void list_bundle_id(AMDeviceRef device)
                          @"CFBundleVersion",
                          @"CFBundleShortVersionString", nil];
     if (key) {
-        NSString * ns_all_key = [NSString stringWithUTF8String:key];
-        NSArray * ns_keys = [ns_all_key componentsSeparatedByString:@"&"];
+        NSArray * ns_keys = [[NSString stringWithUTF8String:key] componentsSeparatedByString:@"&"];
         [a addObjectsFromArray:ns_keys];
     }
     NSDictionary *optionsDict = [NSDictionary dictionaryWithObject:a forKey:@"ReturnAttributes"];
@@ -2284,7 +2283,7 @@ void usage(const char* app) {
         @"  -f, --file_system            specify file system for mkdir / list / upload / download / rm\n"
         @"  -F, --non-recursively        specify non-recursively walk directory\n"
         @"  -j, --json                   format output as JSON\n"
-        @"  -k, --key                    keys for the properties of the app installed. Joined by '&' and used only with -B <list_bundle_id> \n"
+        @"  -k, --key                    keys for the properties of the bundle. Joined by '&' and used only with -B <list_bundle_id> and -j <json> \n"
         @"  --custom-script <script>     path to custom python script to execute in lldb\n"
         @"  --custom-command <command>   specify additional lldb commands to execute\n",
         [NSString stringWithUTF8String:app]);
@@ -2511,7 +2510,7 @@ int main(int argc, char *argv[]) {
 
     if (!app_path && !detect_only && !command_only) {
         usage(argv[0]);
-        on_error(@"One of -[b|c|o|l|w|D|R|e|9] is required to proceed!");
+        on_error(@"One of -[b|c|o|l|w|D|R|X|e|B|C|9|] is required to proceed!");
     }
 
     if (unbuffered) {
