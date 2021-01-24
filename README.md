@@ -85,7 +85,7 @@ python -m py_compile src/scripts/*.py && xcodebuild -target ios-deploy && xcodeb
 	  -E, --error_output <file>    write stderr to this file
 	  --detect_deadlocks <sec>     start printing backtraces for all threads periodically after specific amount of seconds
 	  -f, --file_system            specify file system for mkdir / list / upload / download / rm
-      -k, --key                    keys for the properties of the bundle. Joined by '&' and used only with -B <list_bundle_id> and -j <json>
+	  -k, --key                    keys for the properties of the bundle. Joined by '&' and used only with -B <list_bundle_id> and -j <json>
 	  -F, --non-recursively        specify non-recursively walk directory
 	  -j, --json                   format output as JSON
 
