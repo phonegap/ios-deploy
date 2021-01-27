@@ -39,6 +39,12 @@ Install ios-deploy via [Homebrew](https://brew.sh/) by running:
 brew install ios-deploy
 ```
 
+Install via [MacPorts](https://www.macports.org/) by running:
+
+```
+port install ios-deploy
+```
+
 ## Testing
 
 Run:
