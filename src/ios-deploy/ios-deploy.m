@@ -1714,7 +1714,7 @@ void list_bundle_id(AMDeviceRef device)
                          @"CFBundleVersion",
                          @"CFBundleShortVersionString", nil];
     if (key) {
-        NSArray * ns_keys = [[NSString stringWithUTF8String:key] componentsSeparatedByString:@"&"];
+        NSArray * ns_keys = [[NSString stringWithUTF8String:key] componentsSeparatedByString:@","];
         [a addObjectsFromArray:ns_keys];
     }
     NSDictionary *optionsDict = [NSDictionary dictionaryWithObject:a forKey:@"ReturnAttributes"];
@@ -2283,7 +2283,7 @@ void usage(const char* app) {
         @"  -f, --file_system            specify file system for mkdir / list / upload / download / rm\n"
         @"  -F, --non-recursively        specify non-recursively walk directory\n"
         @"  -j, --json                   format output as JSON\n"
-        @"  -k, --key                    keys for the properties of the bundle. Joined by '&' and used only with -B <list_bundle_id> and -j <json> \n"
+        @"  -k, --key                    keys for the properties of the bundle. Joined by ',' and used only with -B <list_bundle_id> and -j <json> \n"
         @"  --custom-script <script>     path to custom python script to execute in lldb\n"
         @"  --custom-command <command>   specify additional lldb commands to execute\n",
         [NSString stringWithUTF8String:app]);
