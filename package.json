@@ -1,6 +1,6 @@
 {
   "name": "ios-deploy",
-  "version": "1.11.3",
+  "version": "1.11.4",
   "os": [
     "darwin"
   ],
