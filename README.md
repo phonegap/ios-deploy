@@ -155,6 +155,7 @@ The commands below assume that you have an app called `my.app` with bundle id `b
     
     // get more properties of the bundle
     ios-deploy -B -j --key=UIFileSharingEnabled,CFBundlePackageType
+    ios-deploy -B -j --key=UIFileSharingEnabled --key=CFBundlePackageType
 
 
 ## Demo

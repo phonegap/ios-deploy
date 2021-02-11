@@ -98,7 +98,7 @@ char *command = NULL;
 char const*target_filename = NULL;
 char const*upload_pathname = NULL;
 char *bundle_id = NULL;
-char *key = NULL;
+NSMutableArray *keys = NULL;
 bool interactive = true;
 bool justlaunch = false;
 bool file_system = false;
@@ -1713,9 +1713,11 @@ void list_bundle_id(AMDeviceRef device)
                          @"CFBundleDisplayName",
                          @"CFBundleVersion",
                          @"CFBundleShortVersionString", nil];
-    if (key) {
-        NSArray * ns_keys = [[NSString stringWithUTF8String:key] componentsSeparatedByString:@","];
-        [a addObjectsFromArray:ns_keys];
+    if (keys) {
+        for (NSString * key in keys) {
+            [a addObjectsFromArray:[key componentsSeparatedByCharactersInSet:
+                                    [NSCharacterSet characterSetWithCharactersInString:@",&"]]];
+        }
     }
     NSDictionary *optionsDict = [NSDictionary dictionaryWithObject:a forKey:@"ReturnAttributes"];
     CFDictionaryRef options = (CFDictionaryRef)optionsDict;
@@ -2495,7 +2497,8 @@ int main(int argc, char *argv[]) {
             [custom_commands appendFormat:@"%s\n", optarg];
             break;
         case 'k':
-            key = optarg;
+            if (!keys) keys = [[NSMutableArray alloc] init];
+            [keys addObject: [NSString stringWithUTF8String:optarg]];
             break;
         default:
             usage(argv[0]);
