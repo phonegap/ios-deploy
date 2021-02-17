@@ -2087,6 +2087,17 @@ void handle_device(AMDeviceRef device) {
         NSLogOut(@"------ Install phase ------");
         NSLogOut(@"[  0%%] Found %@ connected through %@, beginning install", device_full_name, device_interface_name);
 
+        CFStringRef install_bundle_id = NULL;
+        if (bundle_id != NULL) {
+          install_bundle_id = CFStringCreateWithCString(NULL, bundle_id, kCFStringEncodingUTF8);
+        } else {
+          CFStringRef extracted_bundle_id = copy_bundle_id(url);
+          if (extracted_bundle_id == NULL) {
+            on_error(@"[ ERROR] Could not determine bundle id.");
+          }
+          install_bundle_id = extracted_bundle_id;
+        }
+
         CFDictionaryRef options;
         if (app_deltas == NULL) { // standard install
           // NOTE: the secure version doesn't seem to require us to start the AFC service
@@ -2107,18 +2118,6 @@ void handle_device(AMDeviceRef device) {
           check_error(AMDeviceStopSession(device));
           check_error(AMDeviceDisconnect(device));
         } else { // incremental install
-          CFStringRef extracted_bundle_id = NULL;
-          CFStringRef extracted_bundle_id_ref = copy_bundle_id(url);
-          if (bundle_id != NULL) {
-            extracted_bundle_id = CFStringCreateWithCString(NULL, bundle_id, kCFStringEncodingUTF8);
-            CFRelease(extracted_bundle_id_ref);
-          } else {
-            if (extracted_bundle_id_ref == NULL) {
-              on_error(@"[ ERROR] Could not determine bundle id.");
-            }
-            extracted_bundle_id = extracted_bundle_id_ref;
-          }
-
           CFStringRef deltas_path =
             CFStringCreateWithCString(NULL, app_deltas, kCFStringEncodingUTF8);
           CFURLRef deltas_relative_url =
@@ -2137,7 +2136,7 @@ void handle_device(AMDeviceRef device) {
             CFSTR("ShadowParentKey"),
           };
           CFStringRef values[] = {
-            extracted_bundle_id,
+            install_bundle_id,
             CFSTR("1"),
             CFSTR("1"),
             CFSTR("1"),
@@ -2151,7 +2150,6 @@ void handle_device(AMDeviceRef device) {
 
           // Incremental installs should be done without a session started because of timeouts.
           check_error(AMDeviceSecureInstallApplicationBundle(device, url, options, incremental_install_callback, 0));
-          CFRelease(extracted_bundle_id);
           CFRelease(deltas_path);
           CFRelease(deltas_relative_url);
           CFRelease(app_deltas_url);
@@ -2161,12 +2159,24 @@ void handle_device(AMDeviceRef device) {
 
         CFRelease(options);
 
+        connect_and_start_session(device);
+        CFURLRef device_app_url = copy_device_app_url(device, install_bundle_id);
+        check_error(AMDeviceStopSession(device));
+        check_error(AMDeviceDisconnect(device));
+        CFStringRef device_app_path = CFURLCopyFileSystemPath(device_app_url, kCFURLPOSIXPathStyle);
+
         NSLogOut(@"[100%%] Installed package %@", [NSString stringWithUTF8String:app_path]);
+        NSLogVerbose(@"App path: %@", device_app_path);
         NSLogJSON(@{@"Event": @"BundleInstall",
                     @"OverallPercent": @(100),
                     @"Percent": @(100),
-                    @"Status": @"Complete"
+                    @"Status": @"Complete",
+                    @"Path": (__bridge NSString *)device_app_path
                     });
+
+      CFRelease(device_app_url);
+      CFRelease(install_bundle_id);
+      CFRelease(device_app_path);
     }
     CFRelease(path);
 
