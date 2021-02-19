@@ -30,7 +30,7 @@
  * log enable -v -f /Users/vargaz/gdb-remote.log gdb-remote all
  */
 #define LLDB_PREP_CMDS CFSTR("\
-    platform select remote-ios --sysroot '{symbols_path}'\n\
+    platform select remote-'{platform}' --sysroot '{symbols_path}'\n\
     target create \"{disk_app}\"\n\
     script fruitstrap_device_app=\"{device_app}\"\n\
     script fruitstrap_connect_url=\"connect://127.0.0.1:{device_port}\"\n\
@@ -88,6 +88,7 @@ int AMDeviceSecureInstallApplicationBundle(AMDeviceRef device, CFURLRef url, CFD
 int AMDeviceMountImage(AMDeviceRef device, CFStringRef image, CFDictionaryRef options, void *callback, int cbarg);
 mach_error_t AMDeviceLookupApplications(AMDeviceRef device, CFDictionaryRef options, CFDictionaryRef *result);
 int AMDeviceGetInterfaceType(AMDeviceRef device);
+AMDeviceRef AMDeviceCopyPairedCompanion(AMDeviceRef device);
 
 int AMDServiceConnectionSend(ServiceConnRef con, const void * data, size_t size);
 int AMDServiceConnectionReceive(ServiceConnRef con, void * data, size_t size);
@@ -430,7 +431,7 @@ CFStringRef get_device_full_name(const AMDeviceRef device) {
         CFRelease(device_name);
     if(model != NULL)
         CFRelease(model);
-    if(model_name != NULL)
+    if(model_name != NULL && model_name != model)
         CFRelease(model_name);
     if(product_version)
         CFRelease(product_version);
@@ -483,13 +484,33 @@ NSDictionary* get_device_json_dict(const AMDeviceRef device) {
     return CFAutorelease(json_dict);
 }
 
+int get_companion_interface_type(AMDeviceRef device)
+{
+    assert(AMDeviceGetInterfaceType(device) == 3);
+    AMDeviceRef companion = AMDeviceCopyPairedCompanion(device);
+    int type = AMDeviceGetInterfaceType(companion);
+    AMDeviceRelease(companion);
+    return type;
+}
+
 CFStringRef get_device_interface_name(const AMDeviceRef device) {
-    // AMDeviceGetInterfaceType(device) 0=Unknown, 1 = Direct/USB, 2 = Indirect/WIFI
+    // AMDeviceGetInterfaceType(device) 0=Unknown, 1 = Direct/USB, 2 = Indirect/WIFI, 3 = Companion proxy
     switch(AMDeviceGetInterfaceType(device)) {
         case 1:
             return CFSTR("USB");
         case 2:
             return CFSTR("WIFI");
+        case 3:
+        {
+            if (get_companion_interface_type(device) == 1)
+            {
+                return CFSTR("USB Companion proxy");
+            }
+            else
+            {
+                return CFSTR("WIFI Companion proxy");
+            }
+        }
         default:
             return CFSTR("Unknown Connection");
     }
@@ -512,6 +533,7 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
     CFStringRef build = AMDeviceCopyValue(device, 0, CFSTR("BuildVersion"));
     CFStringRef deviceClass = AMDeviceCopyValue(device, 0, CFSTR("DeviceClass"));
     CFStringRef deviceModel = AMDeviceCopyValue(device, 0, CFSTR("HardwareModel"));
+    CFStringRef productType = AMDeviceCopyValue(device, 0, CFSTR("ProductType"));
     CFStringRef deviceArch = NULL;
     CFStringRef path = NULL;
 
@@ -531,7 +553,12 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
     if (CFStringCompare(CFSTR("AppleTV"), deviceClass, 0) == kCFCompareEqualTo) {
       deviceClassPath[0] = CFSTR("Platforms/AppleTVOS.platform/DeviceSupport");
       deviceClassPath[1] = CFSTR("tvOS DeviceSupport");
-    } else {
+    }
+    else if (CFStringCompare(CFSTR("Watch"), deviceClass, 0) == kCFCompareEqualTo) {
+      deviceClassPath[0] = CFSTR("Platforms/WatchOS.platform/DeviceSupport");
+      deviceClassPath[1] = CFSTR("watchOS DeviceSupport");
+    }
+    else {
       deviceClassPath[0] = CFSTR("Platforms/iPhoneOS.platform/DeviceSupport");
       deviceClassPath[1] = CFSTR("iOS DeviceSupport");
     }
@@ -569,6 +596,11 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
                 path = copy_xcode_path_for(deviceClassPath[i], search);
                 CFRelease(search);
             }
+            if (path == NULL) {
+                CFStringRef search = CFStringCreateWithFormat(NULL, NULL, CFSTR("%@ %@ (%@)/%@"), productType, version, build, suffix);
+                path = copy_xcode_path_for(deviceClassPath[i], search);
+                CFRelease(search);
+            }
         }
         
         CFRelease(version);
@@ -589,6 +621,7 @@ CFStringRef copy_device_support_path(AMDeviceRef device, CFStringRef suffix) {
     CFRelease(version_parts);
     CFRelease(build);
     CFRelease(deviceClass);
+    CFRelease(productType);
     if (deviceModel != NULL) {
         CFRelease(deviceModel);
     }
@@ -823,10 +856,30 @@ CFStringRef copy_modules_search_paths_pairs(CFStringRef symbols_path, CFStringRe
     return res;
 }
 
+CFStringRef get_device_platform(AMDeviceRef device)
+{
+    CFStringRef deviceClass = AMDeviceCopyValue(device, 0, CFSTR("DeviceClass"));
+    CFStringRef platform;
+    if (CFStringCompare(CFSTR("AppleTV"), deviceClass, 0) == kCFCompareEqualTo) {
+        platform = CFSTR("tvos");
+    }
+    else if (CFStringCompare(CFSTR("Watch"), deviceClass, 0) == kCFCompareEqualTo) {
+        platform = CFSTR("watchos");
+    }
+    else {
+        platform = CFSTR("ios");
+    }
+    CFRelease(deviceClass);
+    return platform;
+}
+
 void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     CFStringRef symbols_path = copy_device_support_path(device, CFSTR("Symbols"));
     CFMutableStringRef cmds = CFStringCreateMutableCopy(NULL, 0, LLDB_PREP_CMDS);
     CFRange range = { 0, CFStringGetLength(cmds) };
+
+    CFStringFindAndReplace(cmds, CFSTR("{platform}"), get_device_platform(device), range, 0);
+    range.length = CFStringGetLength(cmds);
 
     CFStringFindAndReplace(cmds, CFSTR("{symbols_path}"), symbols_path, range, 0);
     range.length = CFStringGetLength(cmds);
@@ -1088,9 +1141,9 @@ void start_remote_debug_server(AMDeviceRef device) {
 
     dbgServiceConnection = NULL;
     CFStringRef serviceName = CFSTR("com.apple.debugserver");
-    CFStringRef keys[] = { CFSTR("MinIPhoneVersion"), CFSTR("MinAppleTVVersion") };
-    CFStringRef values[] = { CFSTR("14.0"), CFSTR("14.0")};
-    CFDictionaryRef version = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, 2, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFStringRef keys[] = { CFSTR("MinIPhoneVersion"), CFSTR("MinAppleTVVersion"), CFSTR("MinWatchVersion") };
+    CFStringRef values[] = { CFSTR("14.0"), CFSTR("14.0"), CFSTR("7.0") }; // Not sure about older watchOS versions
+    CFDictionaryRef version = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, 3, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 
     bool useSecureProxy = AMDeviceIsAtLeastVersionOnPlatform(device, version);
     if (useSecureProxy)
@@ -2003,6 +2056,11 @@ void handle_device(AMDeviceRef device) {
         found_device = true;
         return;
     }
+    if (found_device)
+    {
+        NSLogOut(@"Skipping %@.", device_full_name);
+        return;
+    }
     CFStringRef found_device_id = CFAutorelease(AMDeviceCopyDeviceIdentifier(device));
     if (device_id != NULL) {
         CFStringRef deviceCFSTR = CFAutorelease(CFStringCreateWithCString(NULL, device_id, kCFStringEncodingUTF8));
@@ -2100,18 +2158,10 @@ void handle_device(AMDeviceRef device) {
 
         CFDictionaryRef options;
         if (app_deltas == NULL) { // standard install
-          // NOTE: the secure version doesn't seem to require us to start the AFC service
-          ServiceConnRef afcFd;
-          connect_and_start_session(device);
-          check_error(AMDeviceSecureStartService(device, CFSTR("com.apple.afc"), NULL, &afcFd));
-          check_error(AMDeviceStopSession(device));
-          check_error(AMDeviceDisconnect(device));
-
           CFStringRef keys[] = { CFSTR("PackageType") };
           CFStringRef values[] = { CFSTR("Developer") };
           options = CFDictionaryCreate(NULL, (const void **)&keys, (const void **)&values, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
           check_error(AMDeviceSecureTransferPath(0, device, url, options, transfer_callback, 0));
-          AMDServiceConnectionInvalidate(afcFd);
 
           connect_and_start_session(device);
           check_error(AMDeviceSecureInstallApplication(0, device, url, options, install_callback, 0));
@@ -2195,16 +2245,19 @@ void handle_device(AMDeviceRef device) {
 void device_callback(struct am_device_notification_callback_info *info, void *arg) {
     switch (info->msg) {
         case ADNCI_MSG_CONNECTED:
-            if (no_wifi && AMDeviceGetInterfaceType(info->dev) == 2)
+        {
+            int itype = AMDeviceGetInterfaceType(info->dev);
+            if (no_wifi &&  (itype == 2 || ( itype == 3 && get_companion_interface_type(info->dev) == 2)))
             {
-                NSLogVerbose(@"Skipping wifi device (type: %d)", AMDeviceGetInterfaceType(info->dev));
+                NSLogVerbose(@"Skipping wifi device (type: %d)", itype);
             }
             else
             {
-                NSLogVerbose(@"Handling device type: %d", AMDeviceGetInterfaceType(info->dev));
+                NSLogVerbose(@"Handling device type: %d", itype);
                 handle_device(info->dev);
             }
             break;
+        }
         case ADNCI_MSG_DISCONNECTED:
         {
             CFStringRef device_interface_name = get_device_interface_name(info->dev);
@@ -2550,6 +2603,15 @@ int main(int argc, char *argv[]) {
         NSLogOut(@"[....] Waiting for iOS device to be connected");
     }
 
-    AMDeviceNotificationSubscribe(&device_callback, 0, 0, NULL, &notify);
+
+    CFStringRef keys[] = {
+        CFSTR("NotificationOptionSearchForPairedDevices"),
+    };
+    const void* values[] = {
+        kCFBooleanTrue,
+    };
+    CFDictionaryRef options = CFDictionaryCreate(kCFAllocatorDefault, (const void**)keys, values, 1, &kCFCopyStringDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+
+    AMDeviceNotificationSubscribeWithOptions(&device_callback, 0, 0, NULL, &notify, options);
     CFRunLoopRun();
 }
