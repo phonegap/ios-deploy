@@ -163,4 +163,8 @@ device_desc device_db[] = {
                           ADD_DEVICE("J33IAP", "Apple TV 3.1G",              "appletvos", "armv7"),
                           ADD_DEVICE("J42dAP", "Apple TV 4G",                "appletvos", "arm64"),
                           ADD_DEVICE("J105aAP","Apple TV 4K",                "appletvos", "arm64"),
+
+                          // Apple Watch
+                          ADD_DEVICE("N121sAP","Apple Watch Series 3 (GPS)", "watchos", "armv7k"),
+                          ADD_DEVICE("N157bAP","Apple Watch Series 6",       "watchos", "arm64"),
                           };
