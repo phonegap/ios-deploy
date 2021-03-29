@@ -1312,8 +1312,8 @@ void setup_lldb(AMDeviceRef device, CFURLRef url) {
     start_remote_debug_server(device);  // start debugserver
     if (!debugserver_only)
         write_lldb_prep_cmds(device, url);   // dump the necessary lldb commands into a file
-
-    CFRelease(url);
+    if (url != NULL)
+        CFRelease(url);
 
     NSLogOut(@"[100%%] Connecting to remote debug server");
     NSLogOut(@"-------------------------");
@@ -1418,23 +1418,33 @@ void launch_debugger_and_exit(AMDeviceRef device, CFURLRef url) {
 
 void launch_debugserver_only(AMDeviceRef device, CFURLRef url)
 {
-    CFRetain(url);
+    if (url != NULL)
+      CFRetain(url);
     setup_lldb(device,url);
 
-    CFStringRef bundle_identifier = copy_disk_app_identifier(url);
-    CFURLRef device_app_url = copy_device_app_url(device, bundle_identifier);
-    CFRelease(bundle_identifier);
-    CFStringRef device_app_path = CFURLCopyFileSystemPath(device_app_url, kCFURLPOSIXPathStyle);
-    CFRelease(device_app_url);
-    CFRelease(url);
+    CFStringRef device_app_path = NULL;
+    if (url != NULL) {
+      CFStringRef bundle_identifier = copy_disk_app_identifier(url);
+      CFURLRef device_app_url = copy_device_app_url(device, bundle_identifier);
+      CFRelease(bundle_identifier);
+      device_app_path = CFURLCopyFileSystemPath(device_app_url, kCFURLPOSIXPathStyle);
+      CFRelease(device_app_url);
+      CFRelease(url);
+    }
 
     NSLogOut(@"debugserver port: %d", port);
-    NSLogOut(@"App path: %@", device_app_path);
-    NSLogJSON(@{@"Event": @"DebugServerLaunched",
-                @"Port": @(port),
-                @"Path": (__bridge NSString *)device_app_path
-                });
-    CFRelease(device_app_path);
+    if (device_app_path == NULL) {
+        NSLogJSON(@{@"Event": @"DebugServerLaunched",
+                    @"Port": @(port),
+                    });
+    } else {
+        NSLogOut(@"App path: %@", device_app_path);
+        NSLogJSON(@{@"Event": @"DebugServerLaunched",
+                    @"Port": @(port),
+                    @"Path": (__bridge NSString *)device_app_path
+                    });
+        CFRelease(device_app_path);
+    }
 }
 
 CFStringRef copy_bundle_id(CFURLRef app_url)
@@ -2105,6 +2115,10 @@ void handle_device(AMDeviceRef device) {
         exit(0);
     }
 
+    if (debugserver_only && app_path == NULL) {
+        launch_debugserver_only(device, NULL);
+        return;
+    }
 
     CFRetain(device); // don't know if this is necessary?
 
@@ -2574,9 +2588,9 @@ int main(int argc, char *argv[]) {
         on_error(@"The --args and --envs options can not be combined with --nolldb.");
     }
 
-    if (!app_path && !detect_only && !command_only) {
+    if (!app_path && !detect_only && !debugserver_only && !command_only) {
         usage(argv[0]);
-        on_error(@"One of -[b|c|o|l|w|D|R|X|e|B|C|9] is required to proceed!");
+        on_error(@"One of -[b|c|o|l|w|D|N|R|X|e|B|C|9] is required to proceed!");
     }
 
     if (unbuffered) {
