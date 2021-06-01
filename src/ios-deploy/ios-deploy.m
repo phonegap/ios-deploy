@@ -116,7 +116,6 @@ int _detectDeadlockTimeout = 0;
 bool _json_output = false;
 NSMutableArray *_file_meta_info = nil;
 int port = 0;    // 0 means "dynamically assigned"
-CFStringRef last_path = NULL;
 ServiceConnRef dbgServiceConnection = NULL;
 pid_t parent = 0;
 // PID of child process running lldb
@@ -717,10 +716,13 @@ mach_error_t transfer_callback(CFDictionaryRef dict, int arg) {
     CFNumberGetValue(CFDictionaryGetValue(dict, CFSTR("PercentComplete")), kCFNumberSInt32Type, &percent);
 
     if (CFEqual(status, CFSTR("CopyingFile"))) {
-        CFStringRef path = CFDictionaryGetValue(dict, CFSTR("Path"));
+        static CFStringRef last_path = NULL;
+        static int last_overall_percent = -1;
 
-        if ((last_path == NULL || !CFEqual(path, last_path)) && !CFStringHasSuffix(path, CFSTR(".ipa"))) {
-            int overall_percent = percent / 2;
+        CFStringRef path = CFDictionaryGetValue(dict, CFSTR("Path"));
+        int overall_percent = percent / 2;
+
+        if ((last_path == NULL || !CFEqual(path, last_path) || last_overall_percent != overall_percent) && !CFStringHasSuffix(path, CFSTR(".ipa"))) {
             NSLogOut(@"[%3d%%] Copying %@ to device", overall_percent, path);
             NSLogJSON(@{@"Event": @"BundleCopy",
                         @"OverallPercent": @(overall_percent),
@@ -728,6 +730,8 @@ mach_error_t transfer_callback(CFDictionaryRef dict, int arg) {
                         @"Path": (__bridge NSString *)path
                         });
         }
+
+        last_overall_percent = overall_percent;
 
         if (last_path != NULL) {
             CFRelease(last_path);
