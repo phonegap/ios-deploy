@@ -299,7 +299,7 @@ CFStringRef copy_find_path(CFStringRef rootPath, CFStringRef namePattern) {
     return NULL;
 }
 
-CFStringRef copy_xcode_dev_path() {
+CFStringRef copy_xcode_dev_path(void) {
     static char xcode_dev_path[256] = { '\0' };
     if (strlen(xcode_dev_path) == 0) {
         FILE *fpipe = NULL;
@@ -319,7 +319,7 @@ CFStringRef copy_xcode_dev_path() {
     return CFStringCreateWithCString(NULL, xcode_dev_path, kCFStringEncodingUTF8);
 }
 
-const char *get_home() {
+const char *get_home(void) {
     const char* home = getenv("HOME");
     if (!home) {
         struct passwd *pwd = getpwuid(getuid());
@@ -1104,7 +1104,7 @@ void lldb_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef a
         CFRelease(s);
         return;
     }
-    int sent = AMDServiceConnectionSend(dbgServiceConnection, CFDataGetBytePtr(data),  CFDataGetLength (data));
+    int __unused sent = AMDServiceConnectionSend(dbgServiceConnection, CFDataGetBytePtr(data),  CFDataGetLength (data));
     assert (CFDataGetLength (data) == sent);
 }
 
@@ -1279,7 +1279,7 @@ void lldb_finished_handler(int signum)
     _exit(WEXITSTATUS(status));
 }
 
-pid_t bring_process_to_foreground() {
+pid_t bring_process_to_foreground(void) {
     pid_t fgpid = tcgetpgrp(STDIN_FILENO);
     if (setpgid(0, 0) == -1)
         perror("setpgid failed");
@@ -2368,7 +2368,7 @@ void usage(const char* app) {
         [NSString stringWithUTF8String:app]);
 }
 
-void show_version() {
+void show_version(void) {
     NSLogOut(@"%@", @
 #include "version.h"
              );
