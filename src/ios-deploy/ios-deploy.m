@@ -1948,6 +1948,7 @@ void upload_single_file(AMDeviceRef device, AFCConnectionRef afc_conn_p, NSStrin
         check_error(AFCDirectoryCreate(afc_conn_p, [dirpath fileSystemRepresentation]));
     }
 
+    NSLogVerbose(@"%@", destinationPath);
 
     int ret = AFCFileRefOpen(afc_conn_p, [destinationPath fileSystemRepresentation], 3, &file_ref);
     if (ret == 0x000a) {
@@ -1974,6 +1975,7 @@ void upload_dir(AMDeviceRef device, AFCConnectionRef afc_conn_p, NSString* sourc
         [[NSFileManager defaultManager] fileExistsAtPath: sourcePath isDirectory: &isDir];
         if (isDir)
         {
+            NSLogVerbose(@"%@/", destinationPath);
             upload_dir(device, afc_conn_p, sourcePath, destinationPath);
         }
         else
