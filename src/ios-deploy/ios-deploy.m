@@ -116,7 +116,6 @@ int _detectDeadlockTimeout = 0;
 bool _json_output = false;
 NSMutableArray *_file_meta_info = nil;
 int port = 0;    // 0 means "dynamically assigned"
-ServiceConnRef dbgServiceConnection = NULL;
 pid_t parent = 0;
 // PID of child process running lldb
 pid_t child = 0;
@@ -124,9 +123,9 @@ pid_t child = 0;
 const int SIGLLDB = SIGUSR1;
 NSString* tmpUUID;
 struct am_device_notification *notify;
-CFRunLoopSourceRef lldb_socket_runloop;
-CFRunLoopSourceRef server_socket_runloop;
 CFRunLoopSourceRef fdvendor_runloop;
+
+CFMutableDictionaryRef active_connections;
 
 // Error codes we report on different failures, so scripts can distinguish between user app exit
 // codes and our exit codes. For non app errors we use codes in reserved 128-255 range.
@@ -1069,69 +1068,88 @@ void write_lldb_prep_cmds(AMDeviceRef device, CFURLRef disk_app_url) {
     CFRelease(pmodule);
 }
 
-CFSocketRef server_socket;
-CFSocketRef lldb_socket;
-CFWriteStreamRef serverWriteStream = NULL;
-CFWriteStreamRef lldbWriteStream = NULL;
-
 int kill_ptree(pid_t root, int signum);
-void
-server_callback (CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info)
+
+CFSocketContext get_socket_context(int connection_id) {
+    CFSocketContext context = { 0, (void*)CFNumberCreate(NULL, kCFNumberIntType, &connection_id), NULL, NULL, NULL };
+    return context;
+}
+
+CFMutableDictionaryRef get_connection_properties(int connection_id) {
+    // This is no-op if the key already exists
+    CFDictionaryAddValue(active_connections, CFNumberCreate(NULL, kCFNumberIntType, &connection_id),  CFDictionaryCreateMutable(NULL, 0, NULL, NULL));
+
+    return (CFMutableDictionaryRef)CFDictionaryGetValue(active_connections, CFNumberCreate(NULL, kCFNumberIntType, &connection_id));
+}
+
+void close_connection(int connection_id)
 {
+    CFMutableDictionaryRef connection_properties = get_connection_properties(connection_id);
+
+    ServiceConnRef dbgServiceConnection = (ServiceConnRef)CFDictionaryGetValue(connection_properties, @"service_connection");
+    AMDServiceConnectionInvalidate(dbgServiceConnection);
+    CFRelease(dbgServiceConnection);
+
+    CFSocketRef lldb_socket = (CFSocketRef)CFDictionaryGetValue(connection_properties, @"lldb_socket");
+    CFSocketInvalidate(lldb_socket);
+    CFRelease(lldb_socket);
+
+    CFRunLoopSourceRef lldb_socket_runloop = (CFRunLoopSourceRef)CFDictionaryGetValue(connection_properties, @"lldb_socket_runloop");
+    CFRunLoopRemoveSource(CFRunLoopGetMain(), lldb_socket_runloop, kCFRunLoopCommonModes);
+    CFRelease(lldb_socket_runloop);
+
+    CFSocketRef server_socket = (CFSocketRef)CFDictionaryGetValue(connection_properties, @"server_socket");
+    CFSocketInvalidate(server_socket);
+    CFRelease(server_socket);
+
+    CFRunLoopSourceRef server_socket_runloop = (CFRunLoopSourceRef)CFDictionaryGetValue(connection_properties, @"server_socket_runloop");
+    CFRunLoopRemoveSource(CFRunLoopGetMain(), server_socket_runloop, kCFRunLoopCommonModes);
+    CFRelease(server_socket_runloop);
+
+    CFDictionaryRemoveValue(active_connections, CFNumberCreate(NULL, kCFNumberIntType, &connection_id));
+}
+
+void server_callback (CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info)
+{
+    int connection_id;
+    CFNumberGetValue((CFNumberRef)info, kCFNumberIntType, &connection_id);
+
+    CFMutableDictionaryRef connection_properties = get_connection_properties(connection_id);
+
+    ServiceConnRef dbgServiceConnection = (ServiceConnRef)CFDictionaryGetValue(connection_properties, @"service_connection");
+    CFSocketRef lldb_socket = (CFSocketRef)CFDictionaryGetValue(connection_properties, @"lldb_socket");
+
     char buffer[0x1000];
-    int bytesRead = AMDServiceConnectionReceive(dbgServiceConnection, buffer, sizeof(buffer));
-    if (bytesRead == 0)
-    {
-        // close the socket on which we've got end-of-file, the server_socket.
-        CFSocketInvalidate(s);
-        CFRelease(s);
-        return;
-    }
-    write(CFSocketGetNative (lldb_socket), buffer, bytesRead);
-    while (bytesRead == sizeof(buffer))
-    {
+    int bytesRead;
+    do {
         bytesRead = AMDServiceConnectionReceive(dbgServiceConnection, buffer, sizeof(buffer));
-        if (bytesRead > 0)
+        if (bytesRead == 0)
         {
-            write(CFSocketGetNative (lldb_socket), buffer, bytesRead);
+            // close the socket on which we've got end-of-file, the server_socket.
+            close_connection(connection_id);
+            return;
         }
+        write(CFSocketGetNative(lldb_socket), buffer, bytesRead);
     }
+    while (bytesRead == sizeof(buffer));
 }
 
 void lldb_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info)
 {
-    //printf ("lldb: %s\n", CFDataGetBytePtr (data));
+    int connection_id;
+    CFNumberGetValue((CFNumberRef)info, kCFNumberIntType, &connection_id);
 
-    if (CFDataGetLength (data) == 0) {
+    CFMutableDictionaryRef connection_properties = get_connection_properties(connection_id);
+
+    ServiceConnRef dbgServiceConnection = (ServiceConnRef)CFDictionaryGetValue(connection_properties, @"service_connection");
+
+    if (CFDataGetLength(data) == 0) {
         // close the socket on which we've got end-of-file, the lldb_socket.
-        CFSocketInvalidate(s);
-        CFRelease(s);
+        close_connection(connection_id);
         return;
     }
     int __unused sent = AMDServiceConnectionSend(dbgServiceConnection, CFDataGetBytePtr(data),  CFDataGetLength (data));
     assert (CFDataGetLength (data) == sent);
-}
-
-void fdvendor_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info) {
-    CFSocketNativeHandle socket = (CFSocketNativeHandle)(*((CFSocketNativeHandle *)data));
-
-    assert (callbackType == kCFSocketAcceptCallBack);
-    //PRINT ("callback!\n");
-
-    lldb_socket  = CFSocketCreateWithNative(NULL, socket, kCFSocketDataCallBack, &lldb_callback, NULL);
-    int flag = 1;
-    int res = setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(flag));
-    if (res == -1) {
-      on_sys_error(@"Setting socket option failed.");
-    }
-    if (lldb_socket_runloop) {
-        CFRelease(lldb_socket_runloop);
-    }
-    lldb_socket_runloop = CFSocketCreateRunLoopSource(NULL, lldb_socket, 0);
-    CFRunLoopAddSource(CFRunLoopGetMain(), lldb_socket_runloop, kCFRunLoopCommonModes);
-
-    CFSocketInvalidate(s);
-    CFRelease(s);
 }
 
 void connect_and_start_session(AMDeviceRef device) {
@@ -1141,9 +1159,8 @@ void connect_and_start_session(AMDeviceRef device) {
     check_error(AMDeviceStartSession(device));
 }
 
-void start_remote_debug_server(AMDeviceRef device) {
-
-    dbgServiceConnection = NULL;
+ServiceConnRef start_remote_debug_server(AMDeviceRef device) {
+    ServiceConnRef dbgServiceConnection = NULL;
     CFStringRef serviceName = CFSTR("com.apple.debugserver");
     CFStringRef keys[] = { CFSTR("MinIPhoneVersion"), CFSTR("MinAppleTVVersion"), CFSTR("MinWatchVersion") };
     CFStringRef values[] = { CFSTR("14.0"), CFSTR("14.0"), CFSTR("7.0") }; // Not sure about older watchOS versions
@@ -1188,16 +1205,68 @@ void start_remote_debug_server(AMDeviceRef device) {
         disable_ssl(dbgServiceConnection);
     }
 
+    return dbgServiceConnection;
+}
+
+void create_remote_debug_server_socket(int connection_id, AMDeviceRef device) {
+    CFMutableDictionaryRef connection_properties = get_connection_properties(connection_id);
+
+    ServiceConnRef dbgServiceConnection = start_remote_debug_server(device);
+    CFDictionaryAddValue(connection_properties, @"service_connection", dbgServiceConnection);
+
     /*
      * The debugserver connection is through a fd handle, while lldb requires a host/port to connect, so create an intermediate
      * socket to transfer data.
      */
-    server_socket = CFSocketCreateWithNative (NULL, AMDServiceConnectionGetSocket(dbgServiceConnection), kCFSocketReadCallBack, &server_callback, NULL);
-    if (server_socket_runloop) {
-        CFRelease(server_socket_runloop);
-    }
-    server_socket_runloop = CFSocketCreateRunLoopSource(NULL, server_socket, 0);
+    CFSocketContext context = get_socket_context(connection_id);
+    CFSocketRef server_socket = CFSocketCreateWithNative (NULL, AMDServiceConnectionGetSocket(dbgServiceConnection), kCFSocketReadCallBack, &server_callback, &context);
+    CFDictionaryAddValue(connection_properties, @"server_socket", server_socket);
+
+    CFRunLoopSourceRef server_socket_runloop = CFSocketCreateRunLoopSource(NULL, server_socket, 0);
     CFRunLoopAddSource(CFRunLoopGetMain(), server_socket_runloop, kCFRunLoopCommonModes);
+    CFDictionaryAddValue(connection_properties, @"server_socket_runloop", server_socket_runloop);
+}
+
+void create_local_lldb_socket(int connection_id, CFSocketNativeHandle socket) {
+    CFMutableDictionaryRef connection_properties = get_connection_properties(connection_id);
+
+    CFSocketContext context = get_socket_context(connection_id);
+    CFSocketRef lldb_socket  = CFSocketCreateWithNative(NULL, socket, kCFSocketDataCallBack, &lldb_callback, &context);
+    CFDictionaryAddValue(connection_properties, @"lldb_socket", lldb_socket);
+
+    int flag = 1;
+    int res = setsockopt(socket, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(flag));
+    if (res == -1) {
+      on_sys_error(@"Setting socket option failed.");
+    }
+    CFRunLoopSourceRef lldb_socket_runloop = CFSocketCreateRunLoopSource(NULL, lldb_socket, 0);
+    CFRunLoopAddSource(CFRunLoopGetMain(), lldb_socket_runloop, kCFRunLoopCommonModes);
+    CFDictionaryAddValue(connection_properties, @"lldb_socket_runloop", lldb_socket_runloop);
+}
+
+void fdvendor_callback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info) {
+    static int connection_id = 0;
+
+    assert (callbackType == kCFSocketAcceptCallBack);
+
+    if (debugserver_only) {
+        // In case of server mode, we start the debug server connection every time we accept a connection
+        connection_id++;
+        create_remote_debug_server_socket(connection_id, (AMDeviceRef)info);
+    }
+
+    CFSocketNativeHandle socket = (CFSocketNativeHandle)(*((CFSocketNativeHandle *)data));
+    create_local_lldb_socket(connection_id, socket);
+
+    if (!debugserver_only) {
+        // Stop listening after first connection in case not in server mode
+        CFSocketInvalidate(s);
+        CFRelease(s);
+    }
+}
+
+void start_debug_server_multiplexer(AMDeviceRef device) {
+    active_connections = CFDictionaryCreateMutable(NULL, 0, NULL, NULL);
 
     struct sockaddr_in addr4;
     memset(&addr4, 0, sizeof(addr4));
@@ -1206,7 +1275,8 @@ void start_remote_debug_server(AMDeviceRef device) {
     addr4.sin_port = htons(port);
     addr4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-    CFSocketRef fdvendor = CFSocketCreate(NULL, PF_INET, 0, 0, kCFSocketAcceptCallBack, &fdvendor_callback, NULL);
+    CFSocketContext context = { 0, device, NULL, NULL, NULL };
+    CFSocketRef fdvendor = CFSocketCreate(NULL, PF_INET, 0, 0, kCFSocketAcceptCallBack, &fdvendor_callback, &context);
 
     if (port) {
         int yes = 1;
@@ -1313,14 +1383,20 @@ void setup_lldb(AMDeviceRef device, CFURLRef url) {
     NSLogOut(@"Starting debug of %@ connected through %@...", device_full_name, device_interface_name);
 
     mount_developer_image(device);      // put debugserver on the device
-    start_remote_debug_server(device);  // start debugserver
-    if (!debugserver_only)
+
+    start_debug_server_multiplexer(device);  // start debugserver proxy listener
+    if (debugserver_only) {
+        NSLogOut(@"[100%%] Listening for lldb connections");
+    }
+    else {
+        create_remote_debug_server_socket(0, device);   // start debugserver
         write_lldb_prep_cmds(device, url);   // dump the necessary lldb commands into a file
+        NSLogOut(@"[100%%] Connecting to remote debug server");
+    }
+    NSLogOut(@"-------------------------");
+
     if (url != NULL)
         CFRelease(url);
-
-    NSLogOut(@"[100%%] Connecting to remote debug server");
-    NSLogOut(@"-------------------------");
 
     setpgid(getpid(), 0);
     signal(SIGHUP, killed);
