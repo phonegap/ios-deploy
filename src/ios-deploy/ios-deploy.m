@@ -268,12 +268,15 @@ CFStringRef copy_find_path(CFStringRef rootPath, CFStringRef namePattern) {
         CFRelease(path);
         return NULL;
     }
-    
-    if (CFStringFind(namePattern, CFSTR("/"), 0).location == kCFNotFound) {
-        cf_command = CFStringCreateWithFormat(NULL, NULL, CFSTR("find '%@' -name '%@' -maxdepth 1 2>/dev/null | sort | tail -n 1"), rootPath, namePattern);
-    } else {
-        cf_command = CFStringCreateWithFormat(NULL, NULL, CFSTR("find '%@' -path '%@/%@' 2>/dev/null | sort | tail -n 1"), rootPath, rootPath, namePattern);
+
+    CFIndex maxdepth = 1;
+    CFArrayRef findPathSlash = CFStringCreateArrayWithFindResults(NULL, namePattern, CFSTR("/"), CFRangeMake(0, CFStringGetLength(namePattern)), 0);
+    if (findPathSlash != NULL) {
+        maxdepth = CFArrayGetCount(findPathSlash) + 1;
+        CFRelease(findPathSlash);
     }
+
+    cf_command = CFStringCreateWithFormat(NULL, NULL, CFSTR("find '%@' -path '%@/%@' -maxdepth %ld 2>/dev/null | sort | tail -n 1"), rootPath, rootPath, namePattern, maxdepth);
 
     char command[1024] = { '\0' };
     CFStringGetCString(cf_command, command, sizeof(command), kCFStringEncodingUTF8);
